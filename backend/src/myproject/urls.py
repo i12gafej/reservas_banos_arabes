@@ -5,5 +5,9 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('reservations.urls')),  # Incluimos las URLs de la aplicación reservations
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) 
+    path('', include('reservations.urls')),
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# Servir archivos MEDIA durante el desarrollo
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) 
