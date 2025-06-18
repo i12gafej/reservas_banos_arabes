@@ -76,6 +76,32 @@ class AvailabilityManager:
         return availability
 
     # ------------------------------------------------------------------
+    # Creación
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    @transaction.atomic
+    def create_availability(dto: AvailabilityDTO) -> Availability:
+        """Crea una nueva Availability y sus rangos asociados."""
+
+        dto.validate()
+
+        if dto.type == AvailabilityDTO.TYPE_PUNCTUAL:
+            availability = Availability.objects.create(
+                type=dto.type,
+                punctual_day=dto.punctual_day,
+            )
+        else:
+            availability = Availability.objects.create(
+                type=dto.type,
+                weekday=dto.weekday,
+            )
+
+        AvailabilityManager._create_related_ranges(availability, dto.ranges)
+
+        return availability
+
+    # ------------------------------------------------------------------
     # Helper interno
     # ------------------------------------------------------------------
 

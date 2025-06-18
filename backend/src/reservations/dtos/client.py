@@ -31,17 +31,3 @@ class ClientDTO:
     def validate_for_update(self):
         if not self.id:
             raise ValueError("Se requiere 'id' para actualizar un cliente")
-
-
-@dataclass
-class ClientListDTO:
-    """DTO que encapsula un listado de clientes."""
-
-    clients: List[ClientDTO] = field(default_factory=list)
-
-
-@dataclass
-class ClientDeleteDTO:
-    """DTO mínimo para eliminar un cliente por ID."""
-
-    id: int

@@ -2,13 +2,7 @@ from typing import List
 
 from django.db import transaction
 
-from reservations.dtos.client import (
-    ClientCreateDTO,
-    ClientUpdateDTO,
-    ClientDTO,
-    ClientListDTO,
-    ClientDeleteDTO,
-)
+from reservations.dtos.client import ClientDTO
 from reservations.models import Client
 
 
@@ -21,8 +15,8 @@ class ClientManager:
 
     @staticmethod
     @transaction.atomic
-    def create_client(dto: ClientCreateDTO) -> ClientDTO:
-        dto.validate()
+    def create_client(dto: ClientDTO) -> ClientDTO:
+        dto.validate_for_create()
         client = Client.objects.create(
             name=dto.name,
             surname=dto.surname or "",
@@ -37,8 +31,8 @@ class ClientManager:
 
     @staticmethod
     @transaction.atomic
-    def update_client(dto: ClientUpdateDTO) -> ClientDTO:
-        dto.validate()
+    def update_client(dto: ClientDTO) -> ClientDTO:
+        dto.validate_for_update()
         client = Client.objects.get(id=dto.id)
 
         # Lista blanca de campos permitidos a sobreescribir
@@ -62,9 +56,8 @@ class ClientManager:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def list_clients() -> ClientListDTO:
-        clients = Client.objects.all().order_by("-created_at")
-        return ClientListDTO(clients=[ClientManager._to_dto(c) for c in clients])
+    def list_clients() -> List[ClientDTO]:
+        return [ClientManager._to_dto(c) for c in Client.objects.all().order_by("-created_at")]
 
     # ------------------------------------------------------------------
     # Eliminar
@@ -72,8 +65,8 @@ class ClientManager:
 
     @staticmethod
     @transaction.atomic
-    def delete_client(dto: ClientDeleteDTO) -> None:
-        Client.objects.filter(id=dto.id).delete()
+    def delete_client(client_id: int) -> None:
+        Client.objects.filter(id=client_id).delete()
 
     # ------------------------------------------------------------------
     # Helper
