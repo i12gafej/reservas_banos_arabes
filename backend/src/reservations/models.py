@@ -68,6 +68,7 @@ class Product(models.Model):
     uses_massagist = models.BooleanField(default=False, verbose_name="Requiere masajista")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de actualización")
+    visible = models.BooleanField(default=True, verbose_name="Visible")
 
     class Meta:
         verbose_name = "Producto"

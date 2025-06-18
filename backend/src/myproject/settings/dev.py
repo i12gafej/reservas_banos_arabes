@@ -17,6 +17,8 @@ INSTALLED_APPS = [
     
     'colorfield',
     'admin_interface',
+    'rest_framework',
+    'api',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

@@ -52,7 +52,7 @@ class ProductHostingInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price', 'baths_summary', 'hostings_summary', 'uses_capacity', 'uses_massagist', 'created_at')
+    list_display = ('name', 'price', 'baths_summary', 'hostings_summary', 'visible', 'uses_capacity', 'uses_massagist', 'created_at')
     list_filter = ('uses_capacity', 'uses_massagist', 'created_at')
     search_fields = ('name', 'description', 'observation')
     readonly_fields = ('created_at', 'updated_at')
@@ -78,7 +78,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('name', 'description', 'observation', 'price')
         }),
         ('Configuración', {
-            'fields': ('uses_capacity', 'uses_massagist')
+            'fields': ('uses_capacity', 'uses_massagist', 'visible')
         }),
         ('Fechas', {
             'fields': ('created_at', 'updated_at'),
@@ -134,11 +134,17 @@ class ProductsInBookInline(admin.TabularInline):
 class HalfHourTimeSelect(forms.Select):
     def __init__(self, attrs=None):
         choices = []
-        for hour in range(10, 22+1):
+        for hour in range(10, 23+1):
             for minute in (0, 30):
                 time_str = f"{hour:02d}:{minute:02d}:00"
                 label = f"{hour:02d}:{minute:02d}"
                 choices.append((time_str, label))
+        for hour in range(0, 1+1):
+            for minute in (0, 30):
+                time_str = f"{hour:02d}:{minute:02d}:00"
+                label = f"{hour:02d}:{minute:02d}"
+                choices.append((time_str, label))
+        choices.append(('02:00:00', '02:00'))
         super().__init__(attrs, choices)
 
 class CreatorTypeField(forms.ModelChoiceField):
