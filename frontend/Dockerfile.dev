@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar dependencias
+COPY package*.json ./
+RUN npm install
+
+# No copiamos el código fuente aquí, se montará como volumen
+
+# Exponer el puerto de desarrollo de Vite
+EXPOSE 5173
+
+# Comando para desarrollo con hot-reload
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"] 
