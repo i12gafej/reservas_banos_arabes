@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+/*
+  Paleta de colores corporativa para botones ReactiveButton
+*/
+:root {
+  /* Colores principales */
+  --color-primary: #2e9e9f;     /* Aceptar / Guardar */
+  --color-secondary: #791b1d;   /* Cancelar / Peligro */
+  --color-edit: #f6c73c;        /* Añadir / Editar */
+
+  /* Colores terciarios */
+  --color-tertiary-1: #a74d2a;
+  --color-tertiary-2: #f4e2c3;
+
+  /* Neutros */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Sombras */
+  --btn-shadow: rgba(0, 0, 0, .15);
+
+  --container-max: 1280px;   /* ancho máx. del "content wrapper" */
+  --gap:        1rem;        /* separación general */
+  --header-h:   64px;
+}
+
+/* --------------------------------------------------
+  Mapeo de colores para <ReactiveButton />
+  La librería genera un elemento con clase `.reactive-button` más
+  la clase del color indicado (p.ej. `.primary`, `.secondary`, etc.)
+  Estas reglas sobreescriben la paleta por defecto.
+-------------------------------------------------- */
+
+.reactive-button.primary {
+  background: var(--color-primary) !important;
+  color: var(--color-white) !important;
+  box-shadow: 0 4px 6px -1px var(--btn-shadow);
+}
+.reactive-button.secondary {
+  background: var(--color-secondary) !important;
+  color: var(--color-white) !important;
+}
+/* usamos la clase yellow para asociarla a "edit" */
+.reactive-button.yellow {
+  background: var(--color-edit) !important;
+  color: var(--color-black) !important;
+}
+
+/* Clases personalizadas para los colores terciarios */
+.reactive-button.tertiary-1 {
+  background: var(--color-tertiary-1) !important;
+  color: var(--color-white) !important;
+}
+.reactive-button.tertiary-2 {
+  background: var(--color-tertiary-2) !important;
+  color: var(--color-black) !important;
+}
+
+/* Estado hover/focus simple */
+.reactive-button.primary:hover,
+.reactive-button.secondary:hover,
+.reactive-button.yellow:hover,
+.reactive-button.tertiary-1:hover,
+.reactive-button.tertiary-2:hover {
+  filter: brightness(1.05);
+}
+
+.reactive-button[disabled] {
+  opacity: .6;
+  cursor: not-allowed;
+  filter: none;
+}
+
+/* breakpoints */
+@media (min-width: 640px) {  /* sm */
+  :root { --gap: 1.25rem; }
+}
+@media (min-width: 1024px) { /* lg */
+  :root { --gap: 1.5rem; }
+}
+
+/* Tipografía global */
+body {
+  font-family: 'Roboto', Arial, sans-serif;
+} 

@@ -20,8 +20,7 @@ class BookingSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField(read_only=True)
 
     # Datos básicos
-    booking_date = serializers.DateField()
-    booking_time = serializers.TimeField()
+    booking_date = serializers.DateTimeField()
     people = serializers.IntegerField(min_value=1, default=1)
     comment = serializers.CharField(required=False, allow_blank=True)
 

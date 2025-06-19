@@ -1,0 +1,113 @@
+:root {
+  /* Reducimos altura global del header */
+  --header-h: 56px;
+}
+
+.topbar {
+    height: var(--header-h);
+    background: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
+    display: grid;
+    grid-template-columns: auto 1fr auto; /* logo | centro | user */
+    align-items: center;
+    padding: 0 0.75rem;
+    gap: 0;
+  }
+
+.brand {
+  font-weight: 600;
+  color: var(--color-primary);
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  margin-right: 0.75rem;
+}
+
+/* botón hamburguesa */
+.burger {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  display: none;
+  cursor: pointer;
+  justify-self: center;
+}
+
+/* navegación */
+.nav {
+  display: flex;
+  gap: var(--gap);
+  max-width: 60%; /* base: móvil y panel lateral */
+  justify-self: center;
+}
+
+/* Ajustes para pantallas de escritorio */
+@media (min-width: 641px) {
+  .nav {
+    /* Permitimos que el menú ocupe todo el espacio disponible y se envuelva */
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: none;
+  }
+}
+
+.link {
+  text-decoration: none;
+  color: #333;
+  position: relative;
+  padding: 0.25rem 0;
+  /* Tamaño de letra responsivo: aún más pequeño */
+  font-size: clamp(0.6rem, 0.5rem + 0.3vw, 0.8rem);
+}
+.link.active::after,
+.link:hover::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  height: 2px;
+  width: 100%;
+  background: var(--color-primary);
+}
+
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.75rem;
+  justify-self: end;
+}
+.user-icon {
+  font-size: 0.8rem;
+}
+.user-name {
+  font-size: 0.65rem;
+}
+.logout {
+  background: #791b1d;
+  color: #fff;
+  border: none;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* responsive móvil */
+@media (max-width: 640px) {
+    .burger { display: block; }
+    .nav {
+      position: fixed;
+      top: var(--header-h);
+      right: 0;
+      background: #fff;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+      width: 200px;
+      height: calc(100vh - var(--header-h));
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.05);
+      max-width: none;
+    }
+    .nav.open { transform: translateX(0); }
+  } 

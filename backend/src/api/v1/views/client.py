@@ -10,7 +10,7 @@ class ClientViewSet(viewsets.ViewSet):
     """Endpoints CRUD para clientes usando DTO/Manager."""
 
     def list(self, request):
-        dtos = ClientManager.list_clients().clients
+        dtos = ClientManager.list_clients()
         serializer = ClientSerializer(dtos, many=True)
         return Response(serializer.data)
 
@@ -22,13 +22,13 @@ class ClientViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         # Reutilizar manager list + filter para simplicidad
-        dto = next((c for c in ClientManager.list_clients().clients if str(c.id) == str(pk)), None)
+        dto = next((c for c in ClientManager.list_clients() if str(c.id) == str(pk)), None)
         if dto is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(ClientSerializer(dto).data)
 
     def update(self, request, pk=None):
-        dto_current = next((c for c in ClientManager.list_clients().clients if str(c.id) == str(pk)), None)
+        dto_current = next((c for c in ClientManager.list_clients() if str(c.id) == str(pk)), None)
         if dto_current is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         serializer = ClientSerializer(dto_current, data=request.data)

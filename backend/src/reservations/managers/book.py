@@ -12,8 +12,8 @@ import random
 from django.db import transaction
 from django.utils import timezone
 
-from reservations.dtos.book import BookDTO
-from reservations.models import Book
+from reservations.dtos.book import BookDTO, ProductInBookDTO
+from reservations.models import Book, ProductsInBook
 
 
 class BookManager:
@@ -29,13 +29,23 @@ class BookManager:
 
     @staticmethod
     def _to_dto(book: Book) -> BookDTO:
-        """Convierte un modelo Book en BookDTO (sin productos)."""
+        """Convierte un modelo Book en BookDTO (incluye productos)."""
+
+        # Obtener los productos asociados a la reserva
+        product_dtos: List[ProductInBookDTO] = []
+        for pib in ProductsInBook.objects.filter(book_id=book.id):
+            product_dtos.append(
+                ProductInBookDTO(
+                    product_id=pib.product_id,
+                    quantity=pib.quantity,
+                    availability_id=pib.availability_id,
+                )
+            )
 
         return BookDTO(
             id=book.id,
             internal_order_id=book.internal_order_id,
             booking_date=book.book_date,
-            booking_time=book.hour,
             people=book.people,
             comment=book.comment,
             amount_paid=book.amount_paid,
@@ -45,7 +55,7 @@ class BookManager:
             checked_out=book.checked_out,
             client_id=book.client_id,
             created_at=book.created_at,
-            products=[],  # TODO: mapear ProductsInBook
+            products=product_dtos,
         )
 
     # ------------------------------------------------------------------
@@ -65,13 +75,12 @@ class BookManager:
     @staticmethod
     @transaction.atomic
     def create_booking(dto: BookDTO) -> BookDTO:
-        """Crea un Book. Solo cubre campos básicos y omite productos."""
+        """Crea un Book junto con sus ProductsInBook asociados."""
 
         # Validación mínima (ya validada en DTO)
         book = Book.objects.create(
             internal_order_id=BookManager._generate_internal_order_id(),
             book_date=dto.booking_date,
-            hour=dto.booking_time,
             people=dto.people or 1,
             comment=dto.comment or "",
             amount_paid=dto.amount_paid or 0,
@@ -83,6 +92,17 @@ class BookManager:
         )
 
         # TODO: Crear ProductsInBook según dto.products
+        for product_dto in dto.products:
+            if product_dto.availability_id is None:
+                raise ValueError(
+                    "Cada producto en la reserva debe incluir 'availability_id' para indicar el rango horario."
+                )
+            ProductsInBook.objects.create(
+                book=book,
+                product_id=product_dto.product_id,
+                quantity=product_dto.quantity,
+                availability_id=product_dto.availability_id,
+            )
 
         return BookManager._to_dto(book)
 
@@ -100,7 +120,6 @@ class BookManager:
         # Campos permitidos a actualizar
         fields_map = {
             "book_date": dto.booking_date,
-            "hour": dto.booking_time,
             "people": dto.people,
             "comment": dto.comment,
             "amount_paid": dto.amount_paid,

@@ -10,13 +10,13 @@ from api.v1.views.book import BookViewSet
 from api.v1.views.gift_voucher import GiftVoucherViewSet
 
 router = DefaultRouter()
-router.register(r'clients', ClientViewSet, basename='client')
+router.register(r'clientes', ClientViewSet, basename='client')
 router.register(r'admins', AdminViewSet, basename='admin')
-router.register(r'agents', AgentViewSet, basename='agent')
-router.register(r'availabilities', AvailabilityViewSet, basename='availability')
-router.register(r'products', ProductViewSet, basename='product')
-router.register(r'bookings', BookViewSet, basename='booking')
-router.register(r'vouchers', GiftVoucherViewSet, basename='gift-voucher')
+router.register(r'agentes', AgentViewSet, basename='agent')
+router.register(r'disponibilidades', AvailabilityViewSet, basename='availability')
+router.register(r'productos', ProductViewSet, basename='product')
+router.register(r'reservas', BookViewSet, basename='booking')
+router.register(r'cheques', GiftVoucherViewSet, basename='gift-voucher')
 
 urlpatterns = [
     path('', include(router.urls)),

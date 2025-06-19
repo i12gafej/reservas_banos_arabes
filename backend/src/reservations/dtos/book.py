@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, date, time
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -26,8 +26,7 @@ class BookDTO:
     internal_order_id: Optional[str] = None  # Generado al crear
 
     # Datos básicos
-    booking_date: Optional[date] = None  # Día de la reserva
-    booking_time: Optional[time] = None  # Hora reservada
+    booking_date: Optional[datetime] = None  # Día de la reserva
     people: Optional[int] = 1
     comment: Optional[str] = None
 
@@ -47,8 +46,8 @@ class BookDTO:
 
     # Validaciones -----------------------------------------------------------
     def validate_for_create(self):
-        if self.booking_date is None or self.booking_time is None:
-            raise ValueError("Debe indicar 'booking_date' y 'booking_time'")
+        if self.booking_date is None:
+            raise ValueError("Debe indicar 'booking_date'")
         if self.client_id is None:
             raise ValueError("Debe indicar 'client_id'")
         if not self.products:
