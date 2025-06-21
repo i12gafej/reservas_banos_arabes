@@ -4,8 +4,7 @@ import { TimeGrid } from '@/components/timetable';
 import type { AvailabilityRange } from '@/services/masajistas.service';
 import {
   getDayAvailability,
-  saveDayAvailability,
-  saveWeekdayAvailability,
+  saveAvailability,
 } from '@/services/masajistas.service';
 import './masajistas.css';
 import ReactiveButton from 'reactive-button';
@@ -123,9 +122,9 @@ const MasajistasPage: React.FC = () => {
     const ranges = cellsToRanges(cells);
     try {
       if (pendingSave === 'date' && selectedDate) {
-        await saveDayAvailability(selectedDate, ranges);
+        await saveAvailability({ date: selectedDate }, ranges);
       } else if (pendingSave === 'weekday') {
-        await saveWeekdayAvailability(selectedWeekday, ranges);
+        await saveAvailability({ weekday: selectedWeekday }, ranges);
       }
     } catch (err) {
       // eslint-disable-next-line no-console

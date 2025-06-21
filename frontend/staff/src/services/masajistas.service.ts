@@ -147,3 +147,22 @@ export async function saveWeekdayAvailability(
     body: JSON.stringify(payload),
   });
 }
+
+// --------------------------------------------------------------------
+// API Genérica (recomendada) -----------------------------------------
+// --------------------------------------------------------------------
+/**
+ * Guarda una disponibilidad.
+ * Ejemplos de uso:
+ *   saveAvailability({ date: '2025-06-21' }, ranges)
+ *   saveAvailability({ weekday: 1 }, ranges)   // 1=Lunes
+ */
+export async function saveAvailability(
+  target: { date: Date | string } | { weekday: number },
+  ranges: AvailabilityRange[],
+): Promise<Availability> {
+  if ('date' in target) {
+    return saveDayAvailability(target.date, ranges);
+  }
+  return saveWeekdayAvailability(target.weekday, ranges);
+}

@@ -37,7 +37,7 @@ class AvailabilitySerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         ranges_data = validated_data.pop("ranges")
         ranges_dtos = [AvailabilityRangeDTO(**r) for r in ranges_data]
-        dto = AvailabilityDTO(id=instance.id, ranges=ranges_dtos, **validated_data)  # type: ignore
+        dto = AvailabilityDTO(ranges=ranges_dtos, **validated_data)  # type: ignore
         dto.validate()
         updated = AvailabilityManager.update_availability(instance.id, dto)
         return updated 
