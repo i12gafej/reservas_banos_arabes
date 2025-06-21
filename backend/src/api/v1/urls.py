@@ -8,6 +8,7 @@ from api.v1.views.availability import AvailabilityViewSet
 from api.v1.views.product import ProductViewSet
 from api.v1.views.book import BookViewSet
 from api.v1.views.gift_voucher import GiftVoucherViewSet
+from api.v1.views.capacity import CapacityViewSet
 
 router = DefaultRouter()
 router.register(r'clientes', ClientViewSet, basename='client')
@@ -17,6 +18,7 @@ router.register(r'disponibilidades', AvailabilityViewSet, basename='availability
 router.register(r'productos', ProductViewSet, basename='product')
 router.register(r'reservas', BookViewSet, basename='booking')
 router.register(r'cheques', GiftVoucherViewSet, basename='gift-voucher')
+router.register(r'capacity', CapacityViewSet, basename='capacity')
 
 urlpatterns = [
     path('', include(router.urls)),

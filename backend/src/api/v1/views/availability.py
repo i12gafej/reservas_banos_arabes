@@ -20,7 +20,6 @@ class AvailabilityViewSet(viewsets.ViewSet):
             {
                 "initial_time": r.initial_time,
                 "end_time": r.end_time,
-                "capacity": r.capacity,
                 "massagists_availability": r.massagists_availability,
             }
             for r in ranges

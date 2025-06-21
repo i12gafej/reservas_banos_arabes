@@ -171,7 +171,6 @@ class Availability(models.Model):
 class AvailabilityRange(models.Model):
     initial_time = models.TimeField(verbose_name="Hora inicial")
     end_time = models.TimeField(verbose_name="Hora final")
-    capacity = models.IntegerField(verbose_name="Aforo")
     massagists_availability = models.IntegerField(verbose_name="Masajistas disponibles")
     availability = models.ForeignKey(Availability, on_delete=models.CASCADE, verbose_name="Disponibilidad")
 
@@ -278,4 +277,23 @@ class ProductsInGift(models.Model):
 
     def __str__(self):
         return f"{self.product.name} (x{self.quantity})"
+
+
+class Capacity(models.Model):
+    """Modelo independiente para almacenar valores de aforo."""
+
+    value = models.PositiveIntegerField(verbose_name="Aforo", default=8)
+
+    # ――― Patrón singleton ―――
+    def save(self, *args, **kwargs):
+        if not self.pk and Capacity.objects.exists():
+            raise ValueError("Ya existe un registro de aforo. Edítelo en lugar de crear otro.")
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Aforo"
+        verbose_name_plural = "Aforo (único)"
+
+    def __str__(self):
+        return str(self.value)
 

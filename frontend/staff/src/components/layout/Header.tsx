@@ -6,7 +6,7 @@ import './header.css';
 
 const menuItems = [
   { label: 'Cuadrante', path: '/cuadrante' },
-  { label: 'Aforo y Masajistas', path: '/aforo' },
+  { label: 'Masajistas', path: '/masajistas' },
   { label: 'Reservar', path: '/reservar' },
   { label: 'Cheques', path: '/cheques' },
   { label: 'Clientes', path: '/clientes' },

@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'admin_interface',
     'rest_framework',
     'api',
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -29,6 +30,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -101,4 +103,12 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField' 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ------------------------------------------------------------------
+# CORS (solo para entorno de desarrollo)
+# ------------------------------------------------------------------
+
+# Permitimos todas las origins para simplificar en local.
+# En producción conviene limitarlo a los dominios necesarios.
+CORS_ALLOW_ALL_ORIGINS = True 

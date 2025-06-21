@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from .models import (
     Admin, Agent, Client, GiftVoucher,
-    Product, BathType, HostingType, Availability, AvailabilityRange,
+    Product, BathType, HostingType, Availability, AvailabilityRange, Capacity,
     Book, ProductsInBook, ProductsInGift, ProductBaths, ProductHosting,
     WebBooking
 )
@@ -519,9 +519,17 @@ class AvailabilityRangeForm(forms.ModelForm):
 
 @admin.register(AvailabilityRange)
 class AvailabilityRangeAdmin(admin.ModelAdmin):
-    list_display = ('availability', 'initial_time', 'end_time', 'capacity', 'massagists_availability')
+    list_display = ('availability', 'initial_time', 'end_time', 'massagists_availability')
     list_filter = ('availability',)
     search_fields = ('availability__type', 'initial_time', 'end_time')
     autocomplete_fields = ['availability']
     form = AvailabilityRangeForm 
+
+@admin.register(Capacity)
+class CapacityAdmin(admin.ModelAdmin):
+    list_display = ('value',)
+
+    def has_add_permission(self, request):
+        # Permitir «Añadir» solo si no existe ningún registro
+        return not Capacity.objects.exists()
 

@@ -1,5 +1,5 @@
 export { default as CuadrantePage } from './cuadrante/CuadrantePage';
-export { default as AforoMasajistasPage } from './AforoMasajistasPage';
+export { default as MasajistasPage } from './MasajistasPage';
 export { default as ReservarPage } from './ReservarPage';
 export { default as ChequesPage } from './ChequesPage';
 export { default as ClientesPage } from './ClientesPage';

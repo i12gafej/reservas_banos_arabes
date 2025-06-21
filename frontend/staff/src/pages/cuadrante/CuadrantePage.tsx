@@ -1,27 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactiveButton from 'reactive-button';
 import { DefaultDialog, DatePicker } from '@/components/elements';
-import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import PhoneInput from 'react-phone-input-2';
 import esLocale from 'react-phone-input-2/lang/es.json';
 import 'react-phone-input-2/lib/style.css';
+import { getCapacity, updateCapacity, Capacity } from '@/services/cuadrante.service';
 import './cuadrante.css';
 
 const CuadrantePage: React.FC = () => {
-  const [aforo, setAforo] = useState<number | null>(8);
+  const [capacity, setCapacity] = useState<Capacity | null>(null);
+  const aforo = capacity?.value ?? null;
   const [openDlg, setOpenDlg] = useState(false);
   const [draftAforo, setDraftAforo] = useState<number | ''>(aforo ?? '');
 
   // Fecha cuadrante
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  const handleSaveAforo = () => {
-    if (draftAforo !== '') {
-      setAforo(Number(draftAforo));
+  const handleSaveAforo = async () => {
+    if (draftAforo === '') {
+      setOpenDlg(false);
+      return;
     }
-    setOpenDlg(false);
+    try {
+      if (!capacity) return;
+      const updated = await updateCapacity(capacity.id, Number(draftAforo));
+      setCapacity(updated);
+    } catch (err) {
+      console.error('Error actualizando aforo', err);
+    } finally {
+      setOpenDlg(false);
+    }
   };
+
+  // Cargar aforo inicial
+  useEffect(() => {
+    console.log('BASE_URL:', import.meta.env.VITE_API_URL);
+    console.log('Llamada a getCapacity…');
+    getCapacity()
+      .then((cap) => {
+        // Debug: mostramos la respuesta completa en consola
+        // eslint-disable-next-line no-console
+        console.log('Respuesta de getCapacity:', cap);
+        setCapacity(cap);
+      })
+      .catch((err) => console.error('Error obteniendo aforo', err));
+  }, []);
 
   // React Hook Form para reserva
   type FormInputs = {

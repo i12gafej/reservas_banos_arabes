@@ -10,7 +10,7 @@ import { BackToTop } from '@/components/common';
 
 import {
   CuadrantePage,
-  AforoMasajistasPage,
+  MasajistasPage,
   ReservarPage,
   ChequesPage,
   ClientesPage,
@@ -27,7 +27,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/cuadrante" replace />} />
           <Route path="/cuadrante" element={<CuadrantePage />} />
-          <Route path="/aforo" element={<AforoMasajistasPage />} />
+          <Route path="/masajistas" element={<MasajistasPage />} />
           <Route path="/reservar" element={<ReservarPage />} />
           <Route path="/cheques" element={<ChequesPage />} />
           <Route path="/clientes" element={<ClientesPage />} />

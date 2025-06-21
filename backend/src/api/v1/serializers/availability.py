@@ -7,7 +7,6 @@ from reservations.managers.availability import AvailabilityManager
 class AvailabilityRangeSerializer(serializers.Serializer):
     initial_time = serializers.TimeField()
     end_time = serializers.TimeField()
-    capacity = serializers.IntegerField(min_value=1)
     massagists_availability = serializers.IntegerField(min_value=0)
 
     def to_dto(self):
