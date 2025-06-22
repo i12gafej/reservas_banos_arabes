@@ -95,6 +95,7 @@ class BathType(models.Model):
     massage_duration = models.CharField(max_length=50, choices=MASSAGE_DURATION_CHOICES, verbose_name="Duración del masaje")
     baths_duration = models.TimeField(default='02:00:00', verbose_name="Duración del baño")
     description = models.TextField(null=True, blank=True, verbose_name="Descripción")
+    price = models.DecimalField(default=0.00, max_digits=8, decimal_places=2, verbose_name="Precio")
 
     class Meta:
         verbose_name = "Tipo de Baño"
@@ -180,8 +181,8 @@ class AvailabilityRange(models.Model):
 
 class Book(models.Model):
     internal_order_id = models.CharField(max_length=255, unique=True, editable=False, verbose_name="ID de pedido")
-    book_date = models.DateTimeField(verbose_name="Fecha de reserva")
-    hour = models.TimeField(editable=False, verbose_name="Hora de la reserva")
+    book_date = models.DateField(verbose_name="Fecha de reserva")
+    hour = models.TimeField(verbose_name="Hora de la reserva")
     people = models.IntegerField(default=1, verbose_name="Nº personas")
     comment = models.TextField(null=True, blank=True, verbose_name="Comentarios")
     amount_paid = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Cantidad pagada")
@@ -257,7 +258,6 @@ class ProductsInBook(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, verbose_name="Reserva")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Producto")
     quantity = models.IntegerField(default=1, verbose_name="Cantidad")
-    availability = models.ForeignKey(Availability, on_delete=models.CASCADE, verbose_name="Disponibilidad")
 
     class Meta:
         verbose_name = "Producto en Reserva"

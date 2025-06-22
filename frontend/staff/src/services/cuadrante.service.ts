@@ -46,6 +46,63 @@ export interface Capacity {
   value: number;
 }
 
+// --------------------------------------------------------------------
+// Tipos y endpoints de Reservas (Bookings)
+// --------------------------------------------------------------------
+
+export interface ProductInBook {
+  product_id: number;
+  quantity: number;
+  availability_id?: number | null;
+}
+
+export interface Booking {
+  id?: number;
+  internal_order_id?: string;
+
+  booking_date: string; // ISO 8601 date-time (YYYY-MM-DDTHH:mm:ss)
+  hour?: string;        // "HH:MM:SS" si el backend lo separa
+  people: number;
+  comment?: string | null;
+
+  amount_paid: string;     // Decimal en texto para evitar problemas de coma
+  amount_pending: string;  // idem
+  payment_date?: string | null; // ISO date-time
+
+  checked_in: boolean;
+  checked_out: boolean;
+
+  client_id: number;
+  products: ProductInBook[];
+
+  created_at?: string;
+}
+
+const BOOKING_ENDPOINT = `${BASE_URL}/reservas/`;
+
+/** Obtiene todas las reservas */
+export async function getBookings(): Promise<Booking[]> {
+  return http<Booking[]>(BOOKING_ENDPOINT);
+}
+
+export type BookingCreate = Omit<Booking, 'id' | 'internal_order_id' | 'created_at'>;
+
+/** Crea una nueva reserva */
+export async function createBooking(payload: BookingCreate): Promise<Booking> {
+  return http<Booking>(BOOKING_ENDPOINT, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Actualiza una reserva existente */
+export async function updateBooking(id: number, payload: Partial<Booking>): Promise<Booking> {
+  return http<Booking>(`${BOOKING_ENDPOINT}${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
 // API Availability -----------------------------------------------------
 
 export async function getAvailabilities(): Promise<Availability[]> {
@@ -77,5 +134,32 @@ export async function updateCapacity(id: number, value: number): Promise<Capacit
   return http<Capacity>(`${CAPACITY_ENDPOINT}${id}/`, {
     method: 'PUT',
     body: JSON.stringify({ value }),
+  });
+}
+
+export interface StaffBath {
+  massage_type: 'relax' | 'exfoliation' | 'rock' | 'none';
+  minutes: '15' | '30' | '60';
+  quantity: number;
+}
+
+export interface StaffBookingPayload {
+  name: string;
+  surname?: string;
+  phone_number: string;
+  email?: string;
+  date: string;   // YYYY-MM-DD
+  hour: string;   // HH:MM:SS
+  people: number;
+  baths: StaffBath[];
+  comment?: string;
+  send_whatsapp?: boolean;
+}
+
+/** Crea una reserva proveniente de la interfaz staff */
+export async function createStaffBooking(payload: StaffBookingPayload): Promise<Booking> {
+  return http<Booking>(`${BASE_URL}/reservas/staff/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
   });
 }

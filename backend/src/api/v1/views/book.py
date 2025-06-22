@@ -1,8 +1,10 @@
 from rest_framework import status, viewsets
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 from api.v1.serializers.book import BookingSerializer
 from reservations.managers.book import BookManager
+from reservations.dtos.book import StaffBathRequestDTO
 
 
 class BookViewSet(viewsets.ViewSet):
@@ -37,3 +39,30 @@ class BookViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         BookManager.delete_booking(int(pk))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ------------------------------------------------------------------
+    # Endpoint específico para reservas desde staff
+    # ------------------------------------------------------------------
+
+    @action(detail=False, methods=["post"], url_path="staff")
+    def create_from_staff(self, request):
+        data = request.data
+
+        try:
+            baths = data.get("baths", [])
+            bath_dtos = [StaffBathRequestDTO(**b) for b in data.get("baths", [])]
+
+            dto_created = BookManager.create_booking_from_staff(
+                name=data["name"],
+                surname=data.get("surname", ""),
+                phone=data["phone_number"],
+                email=data.get("email", ""),
+                date_str=data["date"],
+                hour_str=data["hour"],
+                people=data["people"],
+                baths=bath_dtos,
+                comment=data.get("comment", ""),
+            )
+            return Response(BookingSerializer(dto_created).data, status=status.HTTP_201_CREATED)
+        except KeyError as e:
+            return Response({"detail": f"Campo requerido faltante: {e.args[0]}"}, status=400)

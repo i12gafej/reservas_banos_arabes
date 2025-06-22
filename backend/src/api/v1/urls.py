@@ -9,6 +9,7 @@ from api.v1.views.product import ProductViewSet
 from api.v1.views.book import BookViewSet
 from api.v1.views.gift_voucher import GiftVoucherViewSet
 from api.v1.views.capacity import CapacityViewSet
+from api.v1.views.bath_type import BathTypeViewSet
 
 router = DefaultRouter()
 router.register(r'clientes', ClientViewSet, basename='client')
@@ -19,6 +20,7 @@ router.register(r'productos', ProductViewSet, basename='product')
 router.register(r'reservas', BookViewSet, basename='booking')
 router.register(r'cheques', GiftVoucherViewSet, basename='gift-voucher')
 router.register(r'capacity', CapacityViewSet, basename='capacity')
+router.register(r'bath-types', BathTypeViewSet, basename='bath-type')
 
 urlpatterns = [
     path('', include(router.urls)),

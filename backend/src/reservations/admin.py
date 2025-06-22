@@ -20,8 +20,8 @@ from django.contrib.contenttypes.models import ContentType
 
 @admin.register(BathType)
 class BathTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'massage_type', 'massage_duration', 'baths_duration', 'description')
-    list_filter = ('massage_type', 'massage_duration')
+    list_display = ('name', 'massage_type', 'massage_duration', 'baths_duration', 'description', 'price')
+    list_filter = ('massage_type', 'massage_duration', 'price')
     search_fields = ('name', 'description')
     ordering = ('name',)
 
@@ -128,7 +128,7 @@ class ProductsInBookInline(admin.TabularInline):
     extra = 1
     verbose_name = "Producto"
     verbose_name_plural = "Productos"
-    autocomplete_fields = ['product', 'availability']
+    autocomplete_fields = ['product']
 
 # Widget personalizado para horas cada 30 minutos entre 10:00 y 22:00
 class HalfHourTimeSelect(forms.Select):
@@ -215,9 +215,9 @@ class BookForm(forms.ModelForm):
         
         # Configurar fechas iniciales si hay instancia
         if instance:
-            initial['booking_date'] = instance.book_date.date()
-            initial['booking_time'] = instance.book_date.time()
-            kwargs['initial'] = initial
+            # `book_date` es ahora DateField y `hour` es TimeField separados
+            self.initial.setdefault('booking_date', instance.book_date)
+            self.initial.setdefault('booking_time', instance.hour)
 
         # Configurar campos del creador
         if 'creator_type' in self.fields:
@@ -258,23 +258,22 @@ class BookForm(forms.ModelForm):
         booking_date = cleaned_data.get('booking_date')
         booking_time = cleaned_data.get('booking_time')
 
-        if booking_date and booking_time:
-            cleaned_data['book_date'] = timezone.make_aware(
-                datetime.combine(booking_date, booking_time)
-            )
+        # Ajustar los valores a los campos reales del modelo
+        if booking_date:
+            cleaned_data['book_date'] = booking_date
+        if booking_time:
+            cleaned_data['hour'] = booking_time
 
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         
-        if self.cleaned_data.get('booking_date') and self.cleaned_data.get('booking_time'):
-            instance.book_date = timezone.make_aware(
-                datetime.combine(
-                    self.cleaned_data['booking_date'],
-                    self.cleaned_data['booking_time']
-                )
-            )
+        # Guardar fecha y hora independientes
+        if self.cleaned_data.get('booking_date') is not None:
+            instance.book_date = self.cleaned_data['booking_date']
+        if self.cleaned_data.get('booking_time') is not None:
+            instance.hour = self.cleaned_data['booking_time']
         
         if commit:
             instance.save()
@@ -325,7 +324,7 @@ class BookAdmin(admin.ModelAdmin):
     booking_date_display.short_description = "Fecha reserva"
 
     def booking_time_display(self, obj):
-        return obj.book_date.strftime('%H:%M')
+        return obj.hour.strftime('%H:%M')
     booking_time_display.short_description = "Hora reserva"
 
     def creator_type_display(self, obj):
@@ -473,8 +472,8 @@ class WebBookingAdmin(admin.ModelAdmin):
 
 @admin.register(ProductsInBook)
 class ProductsInBookAdmin(admin.ModelAdmin):
-    list_display = ('book', 'product', 'quantity', 'availability')
-    list_filter = ('book', 'product', 'availability')
+    list_display = ('book', 'product', 'quantity')
+    list_filter = ('book', 'product')
     search_fields = ('book__internal_order_id', 'product__name')
 
 @admin.register(ProductsInGift)

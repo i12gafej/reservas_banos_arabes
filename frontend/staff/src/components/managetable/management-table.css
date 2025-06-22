@@ -1,0 +1,82 @@
+.mgmt-table {
+  width: 100%;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.table-toolbar select {
+  width: 70px;
+  padding: 0.2rem 0.8rem;
+  height: 35px;
+  font-size: 0.75rem;
+}
+
+.table-toolbar input[type="text"] {
+  width: 200px;
+  padding: 0.15rem 0.35rem;
+  height: 35px;
+  font-size: 0.75rem;
+}
+
+.small-font {
+  font-size: 0.85rem;
+}
+
+.baths-table.small-font {
+  font-size: 0.8rem;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.baths-table.small-font th,
+.baths-table.small-font td {
+  padding: 0.4rem;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pagination-bar .nav-buttons {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.nav-buttons button,
+.nav-buttons .page-btn {
+  margin: 0 0.1rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+}
+
+.page-btn {
+  border: 1px solid var(--color-tertiary, #666);
+  background: transparent;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  color: var(--color-text, #000);
+}
+
+.page-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.info-text {
+  font-size: 0.8rem;
+} 

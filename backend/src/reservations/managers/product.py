@@ -199,3 +199,24 @@ class ProductManager:
                     hosting_type_obj = ProductManager.create_hosting_type(host_q.hosting_type)
 
             ProductHosting.objects.create(product=product, hosting_type=hosting_type_obj, quantity=host_q.quantity)
+
+    # ---------------------------------------------------------------------
+    # Nuevos métodos: gestión de BathType (listado y precio)
+    # ---------------------------------------------------------------------
+
+    @staticmethod
+    def list_bath_types():
+        """Devuelve todos los BathType ordenados por nombre."""
+        return BathType.objects.all().order_by("name")
+
+    @staticmethod
+    @transaction.atomic
+    def update_bath_type_price(bath_type_id: int, new_price):
+        """Actualiza únicamente el precio de un BathType y lo devuelve.
+
+        Lanza BathType.DoesNotExist si el ID no existe.
+        """
+        bath_type = BathType.objects.get(id=bath_type_id)
+        bath_type.price = new_price
+        bath_type.save(update_fields=["price"])
+        return bath_type

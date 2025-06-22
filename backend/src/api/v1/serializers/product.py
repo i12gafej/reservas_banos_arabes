@@ -4,6 +4,8 @@ from reservations.dtos.product import (
     ProductCreateDTO,
     BathQuantityDTO,
     HostingQuantityDTO,
+    BathTypeDTO,
+    HostingTypeDTO,
 )
 from reservations.managers.product import ProductManager
 
@@ -52,8 +54,21 @@ class ProductSerializer(serializers.Serializer):
         baths_data = validated_data.pop("baths", [])
         hostings_data = validated_data.pop("hostings", [])
 
-        baths_dtos = [BathQuantityDTO(bath_type_id=b["bath_type_id"], quantity=b["quantity"]) for b in baths_data]  # type: ignore
-        hostings_dtos = [HostingQuantityDTO(hosting_type_id=h["hosting_type_id"], quantity=h["quantity"]) for h in hostings_data]  # type: ignore
+        baths_dtos = [
+            BathQuantityDTO(
+                bath_type=BathTypeDTO(
+                    id=b["bath_type_id"],
+                    name="", massage_type="", massage_duration="", baths_duration="00:00:00"
+                ),
+                quantity=b["quantity"],
+            ) for b in baths_data
+        ]
+        hostings_dtos = [
+            HostingQuantityDTO(
+                hosting_type=HostingTypeDTO(id=h["hosting_type_id"], name="", capacity=0),
+                quantity=h["quantity"],
+            ) for h in hostings_data
+        ]
 
         dto = ProductCreateDTO(
             baths=baths_dtos,
@@ -74,9 +89,19 @@ class ProductSerializer(serializers.Serializer):
 
         kwargs = {**validated_data}
         if baths_data is not None:
-            kwargs["baths"] = [BathQuantityDTO(bath_type_id=b["bath_type_id"], quantity=b["quantity"]) for b in baths_data]  # type: ignore
+            kwargs["baths"] = [
+                BathQuantityDTO(
+                    bath_type=BathTypeDTO(id=b["bath_type_id"], name="", massage_type="", massage_duration="", baths_duration="00:00:00"),
+                    quantity=b["quantity"],
+                ) for b in baths_data
+            ]
         if hostings_data is not None:
-            kwargs["hostings"] = [HostingQuantityDTO(hosting_type_id=h["hosting_type_id"], quantity=h["quantity"]) for h in hostings_data]  # type: ignore
+            kwargs["hostings"] = [
+                HostingQuantityDTO(
+                    hosting_type=HostingTypeDTO(id=h["hosting_type_id"], name="", capacity=0),
+                    quantity=h["quantity"],
+                ) for h in hostings_data
+            ]
 
         dto = ProductCreateDTO(id=instance.id, **kwargs)  # type: ignore
         product = ProductManager.update_product(instance.id, dto)

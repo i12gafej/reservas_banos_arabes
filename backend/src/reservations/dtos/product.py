@@ -17,6 +17,7 @@ class BathTypeDTO:
     massage_duration: str
     baths_duration: str  # formato 'HH:MM:SS'
     description: Optional[str] = None
+    price: Optional[Decimal] = None
     id: Optional[int] = None  # Opcional: si viene, se usa para lookup directo
 
 

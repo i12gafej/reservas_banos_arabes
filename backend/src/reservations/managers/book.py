@@ -5,15 +5,16 @@ Serializers funcionen sin lanzar ImportError. Las reglas de negocio completas
 deberán desarrollarse más adelante (por ejemplo, gestión de ProductsInBook,
 control de disponibilidad, etc.)."""
 
-from typing import List, Optional
+from typing import List
 
 import random
+from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 
-from reservations.dtos.book import BookDTO, ProductInBookDTO
-from reservations.models import Book, ProductsInBook
+from reservations.dtos.book import BookDTO, ProductInBookDTO, StaffBathRequestDTO
+from reservations.models import Book, ProductsInBook, Product, BathType, ProductBaths, Client
 
 
 class BookManager:
@@ -38,7 +39,6 @@ class BookManager:
                 ProductInBookDTO(
                     product_id=pib.product_id,
                     quantity=pib.quantity,
-                    availability_id=pib.availability_id,
                 )
             )
 
@@ -46,6 +46,7 @@ class BookManager:
             id=book.id,
             internal_order_id=book.internal_order_id,
             booking_date=book.book_date,
+            hour=book.hour,
             people=book.people,
             comment=book.comment,
             amount_paid=book.amount_paid,
@@ -81,6 +82,7 @@ class BookManager:
         book = Book.objects.create(
             internal_order_id=BookManager._generate_internal_order_id(),
             book_date=dto.booking_date,
+            hour=dto.hour,
             people=dto.people or 1,
             comment=dto.comment or "",
             amount_paid=dto.amount_paid or 0,
@@ -93,15 +95,42 @@ class BookManager:
 
         # TODO: Crear ProductsInBook según dto.products
         for product_dto in dto.products:
-            if product_dto.availability_id is None:
-                raise ValueError(
-                    "Cada producto en la reserva debe incluir 'availability_id' para indicar el rango horario."
-                )
             ProductsInBook.objects.create(
                 book=book,
                 product_id=product_dto.product_id,
                 quantity=product_dto.quantity,
-                availability_id=product_dto.availability_id,
+            )
+
+            # ------------------------------------------------------------------
+            # Asegurar BathType y ProductBaths
+            # ------------------------------------------------------------------
+
+            try:
+                prod = Product.objects.get(id=product_dto.product_id)
+            except Product.DoesNotExist:
+                continue  # el producto no existe; la validación superior lanzará error
+
+            # Si el producto ya tiene un baño asociado, no hacemos nada
+            if prod.baths.exists():
+                continue
+
+            # Crear (o reutilizar) un BathType genérico "Default" sin masaje
+            bath_name = f"Default bath for {prod.name}"
+            bath_type, _ = BathType.objects.get_or_create(
+                name=bath_name,
+                defaults={
+                    "massage_type": "none",
+                    "massage_duration": "0",
+                    "baths_duration": "02:00:00",
+                    "description": "Generado automáticamente al crear reserva",
+                },
+            )
+
+            # Crear relación ProductBaths (cantidad 1 por defecto)
+            ProductBaths.objects.get_or_create(
+                product=prod,
+                bath_type=bath_type,
+                defaults={"quantity": 1},
             )
 
         return BookManager._to_dto(book)
@@ -120,6 +149,7 @@ class BookManager:
         # Campos permitidos a actualizar
         fields_map = {
             "book_date": dto.booking_date,
+            "hour": dto.hour,
             "people": dto.people,
             "comment": dto.comment,
             "amount_paid": dto.amount_paid,
@@ -169,3 +199,86 @@ class BookManager:
             if not Book.objects.filter(internal_order_id=new_id).exists():
                 break
         return new_id
+
+    # ------------------------------------------------------------------
+    # Creación desde STAFF
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    @transaction.atomic
+    def create_booking_from_staff(
+        *,
+        name: str,
+        surname: str,
+        phone: str,
+        email: str,
+        date_str: str,
+        hour_str: str,
+        people: int,
+        baths: List[StaffBathRequestDTO],
+        comment: str = "",
+    ) -> BookDTO:
+
+        # 1) Cliente nuevo
+        client = Client.objects.create(
+            name=name,
+            surname=surname,
+            phone_number=phone,
+            email=email,
+        )
+
+        prods: List[Product] = []
+        total = Decimal("0")
+
+        for br in baths:
+            br.validate()
+
+            bath_type, _ = BathType.objects.get_or_create(
+                massage_type=br.massage_type,
+                massage_duration=br.minutes,
+                defaults={
+                    "name": f"{dict(BathType.MASSAGE_TYPE_CHOICES).get(br.massage_type, br.massage_type.title())} {br.minutes}'",
+                    "baths_duration": "02:00:00",
+                    "description": "Autocreado (staff)",
+                    "price": Decimal("0.00"),
+                },
+            )
+
+            prod_name = f"{br.quantity} x {bath_type.name}"
+            product, _ = Product.objects.get_or_create(
+                name=prod_name,
+                visible=False,
+                defaults={
+                    "price": bath_type.price * br.quantity,
+                    "observation": "",
+                    "description": "",
+                    "uses_capacity": True,
+                    "uses_massagist": bath_type.massage_type != "none",
+                },
+            )
+
+            ProductBaths.objects.update_or_create(
+                product=product,
+                bath_type=bath_type,
+                defaults={"quantity": br.quantity},
+            )
+
+            prods.append(product)
+            total += product.price
+
+        # 3) Reserva
+        book = Book.objects.create(
+            internal_order_id=BookManager._generate_internal_order_id(),
+            book_date=date_str,
+            hour=hour_str,
+            people=people,
+            comment=comment,
+            amount_paid=Decimal("0"),
+            amount_pending=total,
+            client=client,
+        )
+
+        for p in prods:
+            ProductsInBook.objects.create(book=book, product=p, quantity=1)
+
+        return BookManager._to_dto(book)

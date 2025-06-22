@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, date, time
 from decimal import Decimal
 from typing import List, Optional
 
@@ -10,9 +10,27 @@ class ProductInBookDTO:
 
     product_id: int
     quantity: int = 1
-    availability_id: Optional[int] = None  # Rango horario concreto usado
 
     def validate(self):
+        if self.quantity <= 0:
+            raise ValueError("La cantidad debe ser mayor que 0")
+
+
+@dataclass
+class StaffBathRequestDTO:
+    """Descripción mínima de un lote de baños (tipo + minutos + cantidad)."""
+
+    massage_type: str   # 'relax' | 'exfoliation' | 'rock' | 'none'
+    minutes: str        # '15' | '30' | '60'
+    quantity: int = 1
+
+    def validate(self):
+        # Permitir que llegue como string desde JSON
+        try:
+            self.quantity = int(self.quantity)
+        except (TypeError, ValueError):
+            raise ValueError("'quantity' debe ser un entero positivo")
+
         if self.quantity <= 0:
             raise ValueError("La cantidad debe ser mayor que 0")
 
@@ -26,7 +44,8 @@ class BookDTO:
     internal_order_id: Optional[str] = None  # Generado al crear
 
     # Datos básicos
-    booking_date: Optional[datetime] = None  # Día de la reserva
+    booking_date: Optional[date] = None  # Día de la reserva
+    hour: Optional[time] = None
     people: Optional[int] = 1
     comment: Optional[str] = None
 

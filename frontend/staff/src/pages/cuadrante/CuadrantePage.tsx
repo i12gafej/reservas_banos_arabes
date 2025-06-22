@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import PhoneInput from 'react-phone-input-2';
 import esLocale from 'react-phone-input-2/lang/es.json';
 import 'react-phone-input-2/lib/style.css';
-import { getCapacity, updateCapacity, Capacity } from '@/services/cuadrante.service';
+import { getCapacity, updateCapacity, Capacity, createStaffBooking, StaffBath } from '@/services/cuadrante.service';
 import './cuadrante.css';
 
 const CuadrantePage: React.FC = () => {
@@ -76,13 +76,54 @@ const CuadrantePage: React.FC = () => {
   } = useForm<FormInputs>({
     defaultValues: {
       hour: '10:00',
-      people: 1,
+      people: undefined as any,
+      massage60Relax: 0,
+      massage60Piedra: 0,
+      massage60Exfol: 0,
+      massage30Relax: 0,
+      massage30Piedra: 0,
+      massage30Exfol: 0,
+      massage15Relax: 0,
     } as any,
   });
 
-  const onSubmit = (data: FormInputs) => {
-    console.log('Reserva enviada', data);
-    reset();
+  const onSubmit = async (data: FormInputs) => {
+    try {
+      // Construir array de baths
+      const baths: StaffBath[] = [];
+      const pushBath = (type: 'relax' | 'exfoliation' | 'rock', minutes: '60' | '30' | '15', qty: number) => {
+        if (qty && qty > 0) {
+          baths.push({ massage_type: type, minutes, quantity: qty });
+        }
+      };
+
+      pushBath('relax', '60', data.massage60Relax);
+      pushBath('rock', '60', data.massage60Piedra);
+      pushBath('exfoliation', '60', data.massage60Exfol);
+      pushBath('relax', '30', data.massage30Relax);
+      pushBath('rock', '30', data.massage30Piedra);
+      pushBath('exfoliation', '30', data.massage30Exfol);
+      pushBath('relax', '15', data.massage15Relax);
+
+      const payload = {
+        name: data.name,
+        surname: data.surname,
+        phone_number: data.phone,
+        email: data.email,
+        date: data.day ? data.day.toISOString().substring(0, 10) : new Date().toISOString().substring(0, 10),
+        hour: data.hour + ':00',
+        people: data.people,
+        baths,
+        comment: data.comments,
+        send_whatsapp: data.sendWhatsapp,
+      };
+
+      const created = await createStaffBooking(payload);
+      console.log('Reserva creada', created);
+      reset();
+    } catch (err) {
+      console.error('Error creando reserva', err);
+    }
   };
 
   return (
@@ -181,7 +222,7 @@ const CuadrantePage: React.FC = () => {
                         );
                       })}
                   </select>
-                  <input type="number" min={1} {...register('people')} className="full-width" style={{ marginTop: '0.5rem', width: '68%' }} />
+                  <input placeholder="Personas" aria-label="Personas" type="number" min={1} {...register('people', { valueAsNumber: true, min: 1 })} className="full-width" style={{ marginTop: '0.5rem', width: '68%' }} />
                   <label style={{ display: 'flex', alignItems: 'center', marginTop: '0.5rem' }}>
                     <input type="checkbox" {...register('force')} /> <span style={{fontSize: '0.87rem'}}>Forzar reserva</span>
                   </label>
