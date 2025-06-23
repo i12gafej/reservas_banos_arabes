@@ -40,6 +40,26 @@ export interface Availability {
   ranges: AvailabilityRange[];
 }
 
+// Nuevos tipos para el sistema de versionado
+export interface AvailabilityHistoryItem {
+  id: number;
+  type: 'weekday' | 'punctual';
+  punctual_day: string | null;
+  weekday: number | null;
+  created_at: string;
+  temporal_range: string;
+  ranges: AvailabilityRange[];
+}
+
+export interface AvailabilityById {
+  id: number;
+  type: 'weekday' | 'punctual';
+  punctual_day: string | null;
+  weekday: number | null;
+  created_at: string;
+  ranges: AvailabilityRange[];
+}
+
 // Endpoints base ------------------------------------------------------
 const AVAIL_ENDPOINT = `${BASE_URL}/disponibilidades/`;
 
@@ -71,6 +91,52 @@ export async function getDayAvailability(targetDay: Date | string): Promise<Avai
   const isoWeekday = weekdayJS === 0 ? 7 : weekdayJS; // Convertir a 1-7
   found = list.find((av) => av.type === 'weekday' && av.weekday === isoWeekday);
   return found ?? null;
+}
+
+// --------------------------------------------------------------------
+// Nuevos métodos para el sistema de versionado
+// --------------------------------------------------------------------
+
+/**
+ * Obtiene el historial completo de disponibilidades para un día específico.
+ */
+export async function getAvailabilityHistory(targetDay: Date | string): Promise<AvailabilityHistoryItem[]> {
+  const isoDay = toLocalISODate(targetDay);
+  return http<AvailabilityHistoryItem[]>(`${AVAIL_ENDPOINT}history/${isoDay}/`);
+}
+
+/**
+ * Obtiene una disponibilidad específica por ID.
+ */
+export async function getAvailabilityById(availabilityId: number): Promise<AvailabilityById | null> {
+  try {
+    return await http<AvailabilityById>(`${AVAIL_ENDPOINT}by-id/${availabilityId}/`);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('404')) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Crea una nueva versión de disponibilidad para un día específico.
+ */
+export async function createAvailabilityVersion(
+  targetDay: Date | string,
+  ranges: AvailabilityRange[],
+  effectiveDate?: Date
+): Promise<Availability> {
+  const payload = {
+    target_date: toLocalISODate(targetDay),
+    ranges: ranges,
+    effective_date: effectiveDate ? toLocalISODate(effectiveDate) : undefined,
+  };
+  
+  return http<Availability>(`${AVAIL_ENDPOINT}create-version/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 // --------------------------------------------------------------------

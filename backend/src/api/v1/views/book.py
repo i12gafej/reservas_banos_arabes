@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 
 from api.v1.serializers.book import BookingSerializer
 from reservations.managers.book import BookManager
-from reservations.dtos.book import StaffBathRequestDTO
+from reservations.dtos.book import StaffBathRequestDTO, StaffBookingPayloadDTO
 
 
 class BookViewSet(viewsets.ViewSet):
@@ -61,22 +61,37 @@ class BookViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="staff")
     def create_from_staff(self, request):
         data = request.data
-
         try:
-            baths = data.get("baths", [])
-            bath_dtos = [StaffBathRequestDTO(**b) for b in data.get("baths", [])]
-
-            dto_created = BookManager.create_booking_from_staff(
+            # Validar y construir el payload DTO
+            payload = StaffBookingPayloadDTO(
+                product_id=data.get("product_id"),
+                baths=[StaffBathRequestDTO(**b) for b in data.get("baths", [])] if data.get("baths") else None,
+                price=data.get("price"),
                 name=data["name"],
                 surname=data.get("surname", ""),
                 phone=data["phone_number"],
                 email=data.get("email", ""),
-                date_str=data["date"],
-                hour_str=data["hour"],
+                date=data["date"],
+                hour=data["hour"],
                 people=data["people"],
-                baths=bath_dtos,
-                comment=data.get("comment", ""),
+                comment=data.get("comment", "")
+            )
+            payload.validate()
+            dto_created = BookManager.create_booking_from_staff(
+                product_id=payload.product_id,
+                baths=payload.baths,
+                price=payload.price,
+                name=payload.name,
+                surname=payload.surname,
+                phone=payload.phone,
+                email=payload.email,
+                date=payload.date,
+                hour=payload.hour,
+                people=payload.people,
+                comment=payload.comment or "",
             )
             return Response(BookingSerializer(dto_created).data, status=status.HTTP_201_CREATED)
         except KeyError as e:
             return Response({"detail": f"Campo requerido faltante: {e.args[0]}"}, status=400)
+        except Exception as e:
+            return Response({"detail": f"Error al crear reserva staff: {str(e)}"}, status=400)

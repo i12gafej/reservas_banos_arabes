@@ -5,6 +5,7 @@
 */
 
 import { getProductBathTypes } from './productos.service';
+import { getDayAvailability as getMasajistasAvailability, AvailabilityRange as MasajistaAvailabilityRange } from './masajistas.service';
 
 const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 
@@ -26,6 +27,29 @@ async function http<T>(url: string, options: RequestInit = {}): Promise<T> {
     throw new Error(`${resp.status} ${resp.statusText} – ${msg}`);
   }
   return resp.json() as Promise<T>;
+}
+
+// Helpers de MasajistasPage
+const TIMES = Array.from({ length: 25 }, (_, i) => {
+  const minutes = 10 * 60 + i * 30;
+  const h = Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, '0');
+  const m = (minutes % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+});
+
+function rangesToCells(ranges: MasajistaAvailabilityRange[]): number[] {
+  const cells = Array(25).fill(0);
+  ranges.forEach((r) => {
+    const startIdx = TIMES.findIndex((t) => t === r.initial_time.substring(0, 5));
+    const endIdx = TIMES.findIndex((t) => t === r.end_time.substring(0, 5));
+    if (startIdx === -1 || endIdx === -1) return;
+    for (let i = startIdx; i < endIdx; i++) {
+      cells[i] = r.massagists_availability;
+    }
+  });
+  return cells;
 }
 
 // Tipos ----------------------------------------------------------------
@@ -52,12 +76,6 @@ export interface Capacity {
 // Tipos y endpoints de Reservas (Bookings)
 // --------------------------------------------------------------------
 
-export interface ProductInBook {
-  product_id: number;
-  quantity: number;
-  availability_id?: number | null;
-}
-
 export interface Booking {
   id?: number;
   internal_order_id?: string;
@@ -75,7 +93,7 @@ export interface Booking {
   checked_out: boolean;
 
   client_id: number;
-  products: ProductInBook[];
+  product_id: number;  // Un solo producto por reserva
 
   created_at?: string;
 }
@@ -210,6 +228,10 @@ export async function calculateCuadrante(date: string): Promise<CuadranteCalcula
   
   // Obtener reservas del día
   const bookings = await getBookingsByDate(date);
+
+  // Obtener disponibilidad de masajistas
+  const masajistasAv = await getMasajistasAvailability(date);
+  const masajistasCells = masajistasAv ? rangesToCells(masajistasAv.ranges) : Array(25).fill(0);
   
   // Generar slots de tiempo (10:00 a 22:00 cada 30 minutos)
   const timeSlots = generateTimeSlots('10:00', '22:00', 30);
@@ -229,8 +251,9 @@ export async function calculateCuadrante(date: string): Promise<CuadranteCalcula
     // Calcular disponibles
     const disponibles = capacity.value - ocupacion;
     
-    // Calcular masajistas disponibles (asumimos 2 por defecto)
-    const masajistasDisponibles = 2;
+    // Calcular masajistas disponibles
+    const slotIndex = timeSlots.findIndex(t => t === hour);
+    const masajistasDisponibles = masajistasCells[slotIndex] ?? 0;
     
     // Calcular minutos ocupados por masajes
     const minutosOcupados = await calculateMinutosOcupados(slotBookings);
@@ -282,21 +305,19 @@ async function calculateMinutosOcupados(bookings: Booking[]): Promise<number> {
   let totalMinutos = 0;
   
   for (const booking of bookings) {
-    for (const productInBook of booking.products) {
-      try {
-        // Obtener tipos de baño del producto
-        const bathTypes = await getProductBathTypes(productInBook.product_id);
-        
-        // Sumar minutos de cada tipo de baño
-        for (const bathType of bathTypes) {
-          if (bathType.massage_duration !== '0') {
-            const minutos = parseInt(bathType.massage_duration);
-            totalMinutos += minutos * productInBook.quantity;
-          }
+    try {
+      // Obtener tipos de baño del producto
+      const bathTypes = await getProductBathTypes(booking.product_id);
+      
+      // Sumar minutos de cada tipo de baño
+      for (const bathType of bathTypes) {
+        if (bathType.massage_duration !== '0') {
+          const minutos = parseInt(bathType.massage_duration);
+          totalMinutos += minutos; // Ya no multiplicamos por quantity porque es un solo producto
         }
-      } catch (error) {
-        console.warn(`Error obteniendo tipos de baño para producto ${productInBook.product_id}:`, error);
       }
+    } catch (error) {
+      console.warn(`Error obteniendo tipos de baño para producto ${booking.product_id}:`, error);
     }
   }
   

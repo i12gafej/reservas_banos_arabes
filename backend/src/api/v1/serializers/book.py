@@ -1,16 +1,7 @@
 from rest_framework import serializers
 
-from reservations.dtos.book import BookDTO, ProductInBookDTO
+from reservations.dtos.book import BookDTO
 from reservations.managers.book import BookManager
-
-
-class ProductInBookSerializer(serializers.Serializer):
-    product_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1, default=1)
-    availability_id = serializers.IntegerField(required=False, allow_null=True)
-
-    def to_dto(self):
-        return ProductInBookDTO(**self.validated_data)
 
 
 class BookingSerializer(serializers.Serializer):
@@ -33,17 +24,14 @@ class BookingSerializer(serializers.Serializer):
     checked_out = serializers.BooleanField(required=False, allow_null=True)
 
     client_id = serializers.IntegerField()
-
-    products = ProductInBookSerializer(many=True)
+    product_id = serializers.IntegerField()
 
     # ------------------------------------------------------------------
     # Creación
     # ------------------------------------------------------------------
 
     def create(self, validated_data):
-        products_data = validated_data.pop("products")
-        product_dtos = [ProductInBookDTO(**p) for p in products_data]
-        dto = BookDTO(products=product_dtos, **validated_data)
+        dto = BookDTO(**validated_data)
         dto.validate_for_create()
         booking_dto = BookManager.create_booking(dto)
         return booking_dto  # devuelve DTO para coherencia con otros serializers
@@ -53,16 +41,7 @@ class BookingSerializer(serializers.Serializer):
     # ------------------------------------------------------------------
 
     def update(self, instance, validated_data):
-        products_data = validated_data.pop("products", None)
-        product_dtos = None
-        if products_data is not None:
-            product_dtos = [ProductInBookDTO(**p) for p in products_data]
-
-        dto_kwargs = {**validated_data}
-        if product_dtos is not None:
-            dto_kwargs["products"] = product_dtos
-
-        dto = BookDTO(id=instance.id, **dto_kwargs)  # type: ignore
+        dto = BookDTO(id=instance.id, **validated_data)  # type: ignore
         dto.validate_for_update()
         updated_dto = BookManager.update_booking(dto)
         return updated_dto 

@@ -1,23 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
-
-
-# ---------------------------------------------------------------------------
-# DTOs auxiliares
-# ---------------------------------------------------------------------------
-
-@dataclass
-class GiftProductQuantityDTO:
-    """Relación producto–cantidad dentro de un cheque regalo."""
-
-    product_id: int
-    quantity: int = 1
-
-    def validate(self) -> None:
-        if self.quantity <= 0:
-            raise ValueError("La cantidad debe ser mayor que 0")
+from typing import Optional
 
 
 # ---------------------------------------------------------------------------
@@ -36,6 +20,7 @@ class GiftVoucherDTO:
     used: Optional[bool] = None
 
     buyer_client_id: Optional[int] = None
+    product_id: Optional[int] = None
 
     recipients_email: Optional[str] = None
     recipients_name: Optional[str] = None
@@ -45,23 +30,16 @@ class GiftVoucherDTO:
 
     created_at: Optional[datetime] = None
 
-    products: List[GiftProductQuantityDTO] = field(default_factory=list)
-
     # Validaciones -----------------------------------------------------------
     def validate_for_create(self):
         if self.price is None or self.price < 0:
             raise ValueError("El precio debe ser un número positivo")
         if self.buyer_client_id is None:
             raise ValueError("Debe indicar 'buyer_client_id'")
-        if not self.products:
-            raise ValueError("Debe incluir al menos un producto")
-        for p in self.products:
-            p.validate()
+        if self.product_id is None:
+            raise ValueError("Debe indicar 'product_id'")
 
     def validate_for_update(self):
         if self.id is None:
             raise ValueError("Se requiere 'id' para actualizar el cheque regalo")
-        if self.products:
-            for p in self.products:
-                p.validate()
 

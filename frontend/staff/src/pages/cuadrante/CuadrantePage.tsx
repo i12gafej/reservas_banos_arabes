@@ -8,6 +8,7 @@ import 'react-phone-input-2/lib/style.css';
 import { getCapacity, updateCapacity, Capacity, createStaffBooking, StaffBath, calculateCuadrante, CuadranteCalculated } from '@/services/cuadrante.service';
 import TimeGrid from '@/components/timetable/TimeGrid';
 import './cuadrante.css';
+import { toLocalISODate } from '@/utils/date';
 
 const CuadrantePage: React.FC = () => {
   const [capacity, setCapacity] = useState<Capacity | null>(null);
@@ -44,7 +45,7 @@ const CuadrantePage: React.FC = () => {
     
     setLoadingCuadrante(true);
     try {
-      const dateStr = selectedDate.toISOString().substring(0, 10);
+      const dateStr = toLocalISODate(selectedDate);
       const data = await calculateCuadrante(dateStr);
       setCuadranteData(data);
     } catch (err) {
@@ -132,7 +133,7 @@ const CuadrantePage: React.FC = () => {
         surname: data.surname,
         phone_number: data.phone,
         email: data.email,
-        date: data.day ? data.day.toISOString().substring(0, 10) : new Date().toISOString().substring(0, 10),
+        date: data.day ? toLocalISODate(data.day) : toLocalISODate(new Date()),
         hour: data.hour + ':00',
         people: data.people,
         baths,

@@ -1,9 +1,8 @@
-"""Gestor de operaciones CRUD para GiftVoucher y ProductsInGift.
+"""Gestor de operaciones CRUD para GiftVoucher.
 
 Esta implementación sigue el patrón de otros *managers* del proyecto. Se basa
 en los DTOs definidos en ``reservations.dtos.gift_voucher`` para exponer los
-datos y en los modelos ``GiftVoucher`` y ``ProductsInGift`` para la
-persistencia.
+datos y en el modelo ``GiftVoucher`` para la persistencia.
 """
 
 from __future__ import annotations
@@ -14,11 +13,8 @@ from typing import List, Optional
 from django.db import transaction
 from django.utils import timezone
 
-from reservations.dtos.gift_voucher import (
-    GiftVoucherDTO,
-    GiftProductQuantityDTO,
-)
-from reservations.models import GiftVoucher, ProductsInGift
+from reservations.dtos.gift_voucher import GiftVoucherDTO
+from reservations.models import GiftVoucher
 
 
 class GiftVoucherManager:
@@ -32,24 +28,19 @@ class GiftVoucherManager:
     def _to_dto(voucher: GiftVoucher) -> GiftVoucherDTO:
         """Convierte un modelo GiftVoucher en GiftVoucherDTO."""
 
-        products = [
-            GiftProductQuantityDTO(product_id=p.product_id, quantity=p.quantity)
-            for p in voucher.productsingift_set.all()
-        ]
-
         return GiftVoucherDTO(
             id=voucher.id,
             code=voucher.code,
             price=voucher.price,
             used=voucher.used,
             buyer_client_id=voucher.buyer_client_id,
+            product_id=voucher.product_id,
             recipients_email=voucher.recipients_email,
             recipients_name=voucher.recipients_name,
             recipients_surname=voucher.recipients_surname,
             gift_name=voucher.gift_name,
             gift_description=voucher.gift_description,
             created_at=voucher.created_at,
-            products=products,
         )
 
     # ------------------------------------------------------------------
@@ -66,18 +57,6 @@ class GiftVoucherManager:
             code = f"{today}{random_digits}"
             if not GiftVoucher.objects.filter(code=code).exists():
                 return code
-
-    @staticmethod
-    def _create_products(voucher: GiftVoucher, products: List[GiftProductQuantityDTO]) -> None:
-        """Crea registros ProductsInGift."""
-
-        for p in products:
-            p.validate()
-            ProductsInGift.objects.create(
-                gift=voucher,
-                product_id=p.product_id,
-                quantity=p.quantity,
-            )
 
     # ------------------------------------------------------------------
     # CRUD público
@@ -100,9 +79,8 @@ class GiftVoucherManager:
             gift_name=dto.gift_name or "",
             gift_description=dto.gift_description or "",
             buyer_client_id=dto.buyer_client_id,
+            product_id=dto.product_id,
         )
-
-        GiftVoucherManager._create_products(voucher, dto.products)
 
         return GiftVoucherManager._to_dto(voucher)
 
@@ -111,9 +89,7 @@ class GiftVoucherManager:
     def list_vouchers() -> List[GiftVoucherDTO]:
         """Devuelve todos los cheques regalo ordenados por fecha de creación."""
 
-        vouchers = (
-            GiftVoucher.objects.prefetch_related("productsingift_set").order_by("-created_at")
-        )
+        vouchers = GiftVoucher.objects.all().order_by("-created_at")
         return [GiftVoucherManager._to_dto(v) for v in vouchers]
 
     # ------------------------------------------------------------------
@@ -121,9 +97,7 @@ class GiftVoucherManager:
     def get_voucher(voucher_id: int) -> Optional[GiftVoucherDTO]:
         """Devuelve el DTO de un cheque regalo o ``None`` si no existe."""
 
-        voucher = (
-            GiftVoucher.objects.prefetch_related("productsingift_set").filter(id=voucher_id).first()
-        )
+        voucher = GiftVoucher.objects.filter(id=voucher_id).first()
         if voucher is None:
             return None
         return GiftVoucherManager._to_dto(voucher)
@@ -146,6 +120,7 @@ class GiftVoucherManager:
             "recipients_surname": dto.recipients_surname,
             "gift_name": dto.gift_name,
             "gift_description": dto.gift_description,
+            "product_id": dto.product_id,
         }
 
         changed_fields = []
@@ -156,12 +131,6 @@ class GiftVoucherManager:
 
         if changed_fields:
             voucher.save(update_fields=changed_fields)
-
-        # Actualizar productos si se proporcionan
-        if dto.products:
-            # Reemplazar relaciones
-            ProductsInGift.objects.filter(gift=voucher).delete()
-            GiftVoucherManager._create_products(voucher, dto.products)
 
         return GiftVoucherManager._to_dto(voucher)
 

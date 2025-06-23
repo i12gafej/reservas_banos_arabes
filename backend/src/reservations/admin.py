@@ -5,7 +5,7 @@ from django.utils.safestring import mark_safe
 from .models import (
     Admin, Agent, Client, GiftVoucher,
     Product, BathType, HostingType, Availability, AvailabilityRange, Capacity,
-    Book, ProductsInBook, ProductsInGift, ProductBaths, ProductHosting,
+    Book, ProductBaths, ProductHosting,
     WebBooking
 )
 from django.db import models
@@ -123,12 +123,7 @@ class CreatorTypeSelect(forms.Select):
         
         return super().render(name, value, attrs, renderer) 
 
-class ProductsInBookInline(admin.TabularInline):
-    model = ProductsInBook
-    extra = 1
-    verbose_name = "Producto"
-    verbose_name_plural = "Productos"
-    autocomplete_fields = ['product']
+
 
 # Widget personalizado para horas cada 30 minutos entre 10:00 y 22:00
 class HalfHourTimeSelect(forms.Select):
@@ -286,7 +281,6 @@ class BookAdmin(admin.ModelAdmin):
     list_filter = ('checked_in', 'checked_out', 'book_date', 'creator_type', 'created_at')
     search_fields = ('internal_order_id', 'client__name', 'client__surname', 'comment')
     readonly_fields = ('created_at', 'creator_type_display', 'internal_order_id', 'hour')
-    inlines = [ProductsInBookInline]
     ordering = ('-created_at',)
     autocomplete_fields = ['client']
 
@@ -313,10 +307,7 @@ class BookAdmin(admin.ModelAdmin):
     total_amount.short_description = "Precio"
 
     def product_summary(self, obj):
-        products = obj.productsinbook_set.all()
-        if not products:
-            return "Sin productos"
-        return ", ".join([f"{product.product.name} (x{product.quantity})" for product in products[:2]])
+        return obj.product.name
     product_summary.short_description = "Producto"
 
     def booking_date_display(self, obj):
@@ -367,12 +358,7 @@ class BookAdmin(admin.ModelAdmin):
 # VALES REGALO - INTERFAZ DE NEGOCIO
 # ============================================================================
 
-class ProductsInGiftInline(admin.TabularInline):
-    model = ProductsInGift
-    extra = 1
-    verbose_name = "Producto"
-    verbose_name_plural = "Productos"
-    autocomplete_fields = ['product']
+
 
 class GiftVoucherForm(forms.ModelForm):
     class Meta:
@@ -388,7 +374,6 @@ class GiftVoucherAdmin(admin.ModelAdmin):
     list_filter = ('used', 'bought_date', 'created_at')
     search_fields = ('code', 'gift_name', 'buyer_client__name', 'recipients_name')
     readonly_fields = ('created_at', 'updated_at')
-    inlines = [ProductsInGiftInline]
     ordering = ('-created_at',)
     autocomplete_fields = ['buyer_client']
     form = GiftVoucherForm
@@ -469,18 +454,6 @@ class WebBookingAdmin(admin.ModelAdmin):
     list_display = ('book', 'created_at')
     readonly_fields = ('created_at',)
     ordering = ('-created_at',)
-
-@admin.register(ProductsInBook)
-class ProductsInBookAdmin(admin.ModelAdmin):
-    list_display = ('book', 'product', 'quantity')
-    list_filter = ('book', 'product')
-    search_fields = ('book__internal_order_id', 'product__name')
-
-@admin.register(ProductsInGift)
-class ProductsInGiftAdmin(admin.ModelAdmin):
-    list_display = ('gift', 'product', 'quantity')
-    list_filter = ('gift', 'product')
-    search_fields = ('gift__code', 'product__name')
 
 @admin.register(ProductBaths)
 class ProductBathsAdmin(admin.ModelAdmin):

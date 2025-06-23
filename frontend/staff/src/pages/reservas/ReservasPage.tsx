@@ -47,7 +47,7 @@ const ReservasPage: React.FC = () => {
       if (r.checked_in) return 'Registrada';
       return 'Pendiente';
     }},
-    { header: 'Productos', accessor: (r) => r.products.map(p=>`${prodMap[p.product_id]??'Prod'} x${p.quantity}`).join(', ') },
+    { header: 'Producto', accessor: (r) => prodMap[r.product_id] ?? `Prod ${r.product_id}` },
     { header: 'Fecha', accessor: (r) => r.booking_date?.substring(0,10) },
     { header: 'Hora', accessor: (r)=> r.hour?.substring(0,5) },
     { header: 'Cliente', accessor: (r)=> clientMap[r.client_id] ?? r.client_id },

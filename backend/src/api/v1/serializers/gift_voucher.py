@@ -1,15 +1,7 @@
 from rest_framework import serializers
 
-from reservations.dtos.gift_voucher import GiftVoucherDTO, GiftProductQuantityDTO
-from reservations.managers.gift_voucher import GiftVoucherManager  # suponemos su existencia
-
-
-class GiftProductQuantitySerializer(serializers.Serializer):
-    product_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1, default=1)
-
-    def to_dto(self):
-        return GiftProductQuantityDTO(**self.validated_data)
+from reservations.dtos.gift_voucher import GiftVoucherDTO
+from reservations.managers.gift_voucher import GiftVoucherManager
 
 
 class GiftVoucherSerializer(serializers.Serializer):
@@ -19,6 +11,7 @@ class GiftVoucherSerializer(serializers.Serializer):
 
     price = serializers.DecimalField(max_digits=8, decimal_places=2)
     buyer_client_id = serializers.IntegerField()
+    product_id = serializers.IntegerField()
 
     used = serializers.BooleanField(required=False, default=False)
 
@@ -28,16 +21,12 @@ class GiftVoucherSerializer(serializers.Serializer):
     gift_name = serializers.CharField(required=False, allow_blank=True)
     gift_description = serializers.CharField(required=False, allow_blank=True)
 
-    products = GiftProductQuantitySerializer(many=True)
-
     # ------------------------------------------------------------------
     # Creación
     # ------------------------------------------------------------------
 
     def create(self, validated_data):
-        products_data = validated_data.pop("products")
-        product_dtos = [GiftProductQuantityDTO(**p) for p in products_data]
-        dto = GiftVoucherDTO(products=product_dtos, **validated_data)
+        dto = GiftVoucherDTO(**validated_data)
         dto.validate_for_create()
         voucher_dto = GiftVoucherManager.create_voucher(dto)
         return voucher_dto
@@ -47,16 +36,7 @@ class GiftVoucherSerializer(serializers.Serializer):
     # ------------------------------------------------------------------
 
     def update(self, instance, validated_data):
-        products_data = validated_data.pop("products", None)
-        product_dtos = None
-        if products_data is not None:
-            product_dtos = [GiftProductQuantityDTO(**p) for p in products_data]
-
-        dto_kwargs = {**validated_data}
-        if product_dtos is not None:
-            dto_kwargs["products"] = product_dtos
-
-        dto = GiftVoucherDTO(id=instance.id, **dto_kwargs)
+        dto = GiftVoucherDTO(id=instance.id, **validated_data)
         dto.validate_for_update()
         updated = GiftVoucherManager.update_voucher(dto)
         return updated 

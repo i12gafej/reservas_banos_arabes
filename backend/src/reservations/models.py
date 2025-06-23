@@ -54,6 +54,7 @@ class GiftVoucher(models.Model):
     buyer_client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name="Cliente comprador")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de actualización")
+    product = models.ForeignKey('Product', on_delete=models.PROTECT, verbose_name="Producto", default=1)
 
     class Meta:
         verbose_name = "Cheque regalo"
@@ -159,6 +160,7 @@ class Availability(models.Model):
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, verbose_name="Tipo")
     punctual_day = models.DateField(null=True, blank=True, verbose_name="Día específico")
     weekday = models.IntegerField(null=True, blank=True, choices=WEEKDAY_CHOICES, verbose_name="Día de la semana")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
 
     class Meta:
         verbose_name = "Disponibilidad"
@@ -192,6 +194,7 @@ class Book(models.Model):
     checked_out = models.BooleanField(default=False, verbose_name="Finalizado")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name="Cliente")
+    product = models.ForeignKey('Product', on_delete=models.PROTECT, verbose_name="Producto", default=1)
     
     # Campos para el creador genérico
     creator_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Origen de creación")
@@ -253,31 +256,6 @@ class WebBooking(models.Model):
     class Meta:
         verbose_name = "Reserva Web"
         verbose_name_plural = "Reservas Web"
-
-class ProductsInBook(models.Model):
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, verbose_name="Reserva")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Producto")
-    quantity = models.IntegerField(default=1, verbose_name="Cantidad")
-
-    class Meta:
-        verbose_name = "Producto en Reserva"
-        verbose_name_plural = "Productos en Reservas"
-
-    def __str__(self):
-        return f"{self.product.name} (x{self.quantity})"
-
-class ProductsInGift(models.Model):
-    gift = models.ForeignKey(GiftVoucher, on_delete=models.CASCADE, verbose_name="Vale regalo")
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Producto")
-    quantity = models.IntegerField(default=1, verbose_name="Cantidad")
-
-    class Meta:
-        verbose_name = "Producto en Vale Regalo"
-        verbose_name_plural = "Productos en Vales Regalo"
-
-    def __str__(self):
-        return f"{self.product.name} (x{self.quantity})"
-
 
 class Capacity(models.Model):
     """Modelo independiente para almacenar valores de aforo."""
