@@ -104,3 +104,8 @@ export async function updateProduct(id: number, payload: Partial<ProductCreate>)
     body: JSON.stringify(payload),
   });
 }
+
+/** Obtiene los tipos de baño de un producto específico */
+export async function getProductBathTypes(productId: number): Promise<BathType[]> {
+  return http<BathType[]>(`${PRODUCTS_ENDPOINT}${productId}/baths/`);
+}

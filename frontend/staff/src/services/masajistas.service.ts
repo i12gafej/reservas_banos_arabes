@@ -3,6 +3,8 @@
   Usa el mismo patrón que cuadrante.service.ts para resolver la URL base.
 */
 
+import { toLocalISODate } from '@/utils/date';
+
 const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 
 if (!BASE_URL) {
@@ -57,7 +59,7 @@ export async function getAvailabilities(): Promise<Availability[]> {
  * 3. Si no encuentra nada, devuelve null.
  */
 export async function getDayAvailability(targetDay: Date | string): Promise<Availability | null> {
-  const isoDay = typeof targetDay === 'string' ? targetDay : targetDay.toISOString().substring(0, 10);
+  const isoDay = toLocalISODate(targetDay);
   const list = await getAvailabilities();
 
   // 1) puntual
@@ -85,7 +87,7 @@ export async function saveDayAvailability(
   targetDay: Date | string,
   ranges: AvailabilityRange[],
 ): Promise<Availability> {
-  const isoDay = typeof targetDay === 'string' ? targetDay : targetDay.toISOString().substring(0, 10);
+  const isoDay = toLocalISODate(targetDay);
 
   // Intentar obtener disponibilidad puntual existente
   const existing = await getDayAvailability(isoDay);

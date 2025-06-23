@@ -1,7 +1,163 @@
 .cuadrante-page {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.cuadrante-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1rem;
+  height: 100%;
+}
+
+.cuadrante-page aside {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.cuadrante-page main {
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.aforo-text {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.picker-dia {
+  width: 100%;
+}
+
+.full-width {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.massage-table {
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Estilos para las tablas del cuadrante */
+.tg-wrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.tg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tg-table th,
+.tg-table td {
+  border: 1px solid #ddd;
+  padding: 0.5rem;
+  text-align: center;
+  min-width: var(--col-width, 60px);
+  font-size: 0.77em;
+}
+
+.tg-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.tg-label-col {
+  position: sticky;
+  left: 0;
+  background-color: #f5f5f5;
+  z-index: 1;
+  min-width: 180px;
+  text-align: left;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.tg-time-col {
+  background-color: #f9f9f9;
+  font-weight: bold;
+  font-size: 0.8em;
+}
+
+/* Colores para diferentes valores */
+.tg-cell[data-value="0"] {
+  background-color: #e8f5e8;
+  color: #2d5a2d;
+}
+
+.tg-cell[data-value="negative"] {
+  background-color: #ffe8e8;
+  color: #d32f2f;
+}
+
+.tg-cell[data-value="warning"] {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+/* Colores específicos para el cuadrante */
+.tg-cell-ocupado {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  font-weight: bold;
+}
+
+.tg-cell-vacio {
+  background-color: #f5f5f5;
+  color: #757575;
+}
+
+.tg-cell-negative {
+  background-color: #ffebee;
+  color: #d32f2f;
+  font-weight: bold;
+}
+
+.tg-cell-warning {
+  background-color: #fff3e0;
+  color: #f57c00;
+  font-weight: bold;
+}
+
+.tg-cell-low {
+  background-color: #fff8e1;
+  color: #f57f17;
+}
+
+.tg-cell-normal {
+  background-color: #f1f8e9;
+  color: #33691e;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .cuadrante-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .cuadrante-page aside {
+    order: 2;
+  }
+  
+  .cuadrante-page main {
+    order: 1;
+  }
 }
 
 .aforo-banner {
@@ -23,18 +179,6 @@
   cursor: pointer;
 }
 
-.cuadrante-grid {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 1rem;
-}
-
-.card {
-  border: 1px solid #d33;
-  border-radius: 4px;
-  padding: 0.75rem;
-}
-
 .card h3 {
   margin: 0;           /* elimina margen superior e inferior */
   padding-bottom: .5rem;/* opcional: deja 8 px dentro de la tarjeta */
@@ -46,10 +190,6 @@
   font-size: 0.87rem;
 }
 
-.full-width {
-  width: 100%;
-}
-
 @media (max-width: 800px) {
   .cuadrante-grid {
     grid-template-columns: 1fr;
@@ -58,7 +198,7 @@
 
 input.full-width {
   width: 80%;
-  height: 42px;
+  height: 30px;
   padding: 0 0.75rem;
   margin-bottom: 0.2rem;
   border: 1px solid #ccc;
@@ -79,7 +219,7 @@ select.full-width {
 
 textarea.full-width {
   width: 87%;
-  height: 100px;
+  height: 70px;
   padding: 0.75rem;
   margin-top: 1rem;
   border: 1px solid #ccc;
@@ -130,7 +270,7 @@ textarea.full-width {
 /* ② solo afecta a este DatePicker */
 .picker-dia .react-datepicker__input-container input {
   width: 68%;        /* o el valor que necesites */
-
+  height: 30px;
 }
 
 .picker-dia .react-datepicker__close-icon {

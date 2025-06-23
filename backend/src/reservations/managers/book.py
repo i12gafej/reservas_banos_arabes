@@ -69,6 +69,12 @@ class BookManager:
 
         return [BookManager._to_dto(b) for b in Book.objects.all().order_by("-created_at")]
 
+    @staticmethod
+    def list_bookings_by_date(booking_date: str) -> List[BookDTO]:
+        """Devuelve todas las reservas de una fecha específica ordenadas por hora."""
+
+        return [BookManager._to_dto(b) for b in Book.objects.filter(book_date=booking_date).order_by("hour")]
+
     # ------------------------------------------------------------------
     # Creación
     # ------------------------------------------------------------------

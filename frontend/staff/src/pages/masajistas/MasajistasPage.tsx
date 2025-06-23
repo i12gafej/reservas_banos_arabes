@@ -8,6 +8,7 @@ import {
 } from '@/services/masajistas.service';
 import './masajistas.css';
 import ReactiveButton from 'reactive-button';
+import { toLocalISODate } from '@/utils/date';
 
 const TIMES = Array.from({ length: 25 }, (_, i) => {
   const minutes = 10 * 60 + i * 30;
@@ -78,7 +79,13 @@ const MasajistasPage: React.FC = () => {
   // ------------------------------------------------------------------
   useEffect(() => {
     if (mode === 'date' && selectedDate) {
+      console.log('[Masajistas] 📅 Modo "date" – fecha seleccionada:', {
+        iso: selectedDate.toISOString(),
+        local: selectedDate,
+        weekdayJs: selectedDate.getDay(), // 0=Domingo…6=Sábado
+      });
       getDayAvailability(selectedDate).then((av) => {
+        console.log('[Masajistas] 📦 Respuesta availability (date):', av);
         if (av) {
           if (av.type === 'punctual') {
             setInfoMsg(
@@ -99,11 +106,17 @@ const MasajistasPage: React.FC = () => {
 
   useEffect(() => {
     if (mode === 'weekday') {
+      console.log('[Masajistas] 📅 Modo "weekday" – weekday seleccionado:', selectedWeekday);
       // Simular día para obtener disponibilidad
       const tempDate = new Date();
       const weekdayToDate = new Date(tempDate.setDate(tempDate.getDate() + (((selectedWeekday - 1 - (tempDate.getDay() + 6) % 7) + 7) % 7)));
-      const iso = weekdayToDate.toISOString().substring(0, 10);
+      console.log('[Masajistas]  └─ fecha simulada para consulta:', {
+        iso: weekdayToDate.toISOString(),
+        local: weekdayToDate,
+      });
+      const iso = toLocalISODate(weekdayToDate);
       getDayAvailability(iso).then((av) => {
+        console.log('[Masajistas] 📦 Respuesta availability (weekday):', av);
         if (av && av.type === 'weekday') {
           setInfoMsg(`Disponibilidad por defecto encontrada para ${weekdayNames[selectedWeekday - 1]}.`);
           setCells(rangesToCells(av.ranges));
@@ -120,6 +133,12 @@ const MasajistasPage: React.FC = () => {
   // ------------------------------------------------------------------
   const handleSave = async () => {
     const ranges = cellsToRanges(cells);
+    console.log('[Masajistas] 💾 Guardar – payload a enviar:', {
+      pendingSave,
+      selectedDate,
+      selectedWeekday,
+      ranges,
+    });
     try {
       if (pendingSave === 'date' && selectedDate) {
         await saveAvailability({ date: selectedDate }, ranges);

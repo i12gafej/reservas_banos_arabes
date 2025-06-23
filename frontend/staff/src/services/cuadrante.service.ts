@@ -4,6 +4,8 @@
   Ej. en tu .env.local →  VITE_API_URL="http://localhost:8000/api/v1"
 */
 
+import { getProductBathTypes } from './productos.service';
+
 const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 
 if (!BASE_URL) {
@@ -85,6 +87,11 @@ export async function getBookings(): Promise<Booking[]> {
   return http<Booking[]>(BOOKING_ENDPOINT);
 }
 
+/** Obtiene reservas por fecha específica */
+export async function getBookingsByDate(date: string): Promise<Booking[]> {
+  return http<Booking[]>(`${BOOKING_ENDPOINT}by-date/?date=${date}`);
+}
+
 export type BookingCreate = Omit<Booking, 'id' | 'internal_order_id' | 'created_at'>;
 
 /** Crea una nueva reserva */
@@ -162,4 +169,136 @@ export async function createStaffBooking(payload: StaffBookingPayload): Promise<
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+// --------------------------------------------------------------------
+// Interfaces para el cuadrante
+// --------------------------------------------------------------------
+
+export interface CuadranteData {
+  date: string;
+  capacity: number;
+  bookings: Booking[];
+  timeSlots: string[]; // Array de horas "HH:MM"
+}
+
+export interface TimeSlotData {
+  hour: string;
+  ocupacion: number;
+  disponibles: number;
+  masajistasDisponibles: number;
+  minutosOcupados: number;
+  minutosDisponibles: number;
+}
+
+export interface CuadranteCalculated {
+  date: string;
+  capacity: number;
+  timeSlots: TimeSlotData[];
+}
+
+// --------------------------------------------------------------------
+// Funciones de cálculo para el cuadrante
+// --------------------------------------------------------------------
+
+/**
+ * Calcula los datos del cuadrante para una fecha específica
+ */
+export async function calculateCuadrante(date: string): Promise<CuadranteCalculated> {
+  // Obtener capacidad
+  const capacity = await getCapacity();
+  
+  // Obtener reservas del día
+  const bookings = await getBookingsByDate(date);
+  
+  // Generar slots de tiempo (10:00 a 22:00 cada 30 minutos)
+  const timeSlots = generateTimeSlots('10:00', '22:00', 30);
+  
+  // Calcular datos para cada slot
+  const calculatedSlots: TimeSlotData[] = [];
+  
+  for (const hour of timeSlots) {
+    const slotBookings = bookings.filter(b => {
+      const bookingHour = b.hour?.substring(0, 5) || '00:00';
+      return bookingHour === hour;
+    });
+    
+    // Calcular ocupación (personas totales)
+    const ocupacion = slotBookings.reduce((sum, b) => sum + b.people, 0);
+    
+    // Calcular disponibles
+    const disponibles = capacity.value - ocupacion;
+    
+    // Calcular masajistas disponibles (asumimos 2 por defecto)
+    const masajistasDisponibles = 2;
+    
+    // Calcular minutos ocupados por masajes
+    const minutosOcupados = await calculateMinutosOcupados(slotBookings);
+    
+    // Calcular minutos disponibles (masajistas * 25 - ocupados)
+    const minutosDisponibles = (masajistasDisponibles * 25) - minutosOcupados;
+    
+    calculatedSlots.push({
+      hour,
+      ocupacion,
+      disponibles,
+      masajistasDisponibles,
+      minutosOcupados,
+      minutosDisponibles
+    });
+  }
+  
+  return {
+    date,
+    capacity: capacity.value,
+    timeSlots: calculatedSlots
+  };
+}
+
+/**
+ * Genera slots de tiempo entre start y end cada step minutos
+ */
+function generateTimeSlots(start: string, end: string, stepMinutes: number): string[] {
+  const [startH, startM] = start.split(':').map(Number);
+  const [endH, endM] = end.split(':').map(Number);
+  const result: string[] = [];
+  let minutes = startH * 60 + startM;
+  const endTotal = endH * 60 + endM;
+  
+  while (minutes <= endTotal) {
+    const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+    const m = (minutes % 60).toString().padStart(2, '0');
+    result.push(`${h}:${m}`);
+    minutes += stepMinutes;
+  }
+  
+  return result;
+}
+
+/**
+ * Calcula los minutos ocupados por masajes en las reservas
+ */
+async function calculateMinutosOcupados(bookings: Booking[]): Promise<number> {
+  let totalMinutos = 0;
+  
+  for (const booking of bookings) {
+    for (const productInBook of booking.products) {
+      try {
+        // Obtener tipos de baño del producto
+        const bathTypes = await getProductBathTypes(productInBook.product_id);
+        
+        // Sumar minutos de cada tipo de baño
+        for (const bathType of bathTypes) {
+          if (bathType.massage_duration !== '0') {
+            const minutos = parseInt(bathType.massage_duration);
+            totalMinutos += minutos * productInBook.quantity;
+          }
+        }
+      } catch (error) {
+        console.warn(`Error obteniendo tipos de baño para producto ${productInBook.product_id}:`, error);
+      }
+    }
+  }
+  
+  return totalMinutos;
 }

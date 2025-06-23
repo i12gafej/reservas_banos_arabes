@@ -15,6 +15,20 @@ class BookViewSet(viewsets.ViewSet):
         serializer = BookingSerializer(dtos, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="by-date")
+    def by_date(self, request):
+        """Obtiene reservas por fecha específica."""
+        date_str = request.query_params.get('date')
+        if not date_str:
+            return Response({"detail": "Se requiere el parámetro 'date' (YYYY-MM-DD)"}, status=400)
+        
+        try:
+            dtos = BookManager.list_bookings_by_date(date_str)
+            serializer = BookingSerializer(dtos, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"detail": f"Error al obtener reservas: {str(e)}"}, status=400)
+
     def create(self, request):
         serializer = BookingSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

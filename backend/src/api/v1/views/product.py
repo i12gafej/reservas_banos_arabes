@@ -1,7 +1,9 @@
 from rest_framework import status, viewsets
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 from api.v1.serializers.product import ProductSerializer
+from api.v1.serializers.bath_type import BathTypeSerializer
 from reservations.models import Product
 from reservations.managers.product import ProductManager
 
@@ -40,3 +42,18 @@ class ProductViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         ProductManager.delete_product(int(pk))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'])
+    def baths(self, request, pk=None):
+        """Obtiene los tipos de baño asociados a un producto."""
+        try:
+            product = Product.objects.get(id=pk)
+        except Product.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        
+        # Obtener los tipos de baño a través de ProductBaths
+        product_baths = product.baths.all().select_related('bath_type')
+        bath_types = [pb.bath_type for pb in product_baths]
+        
+        serializer = BathTypeSerializer(bath_types, many=True)
+        return Response(serializer.data)

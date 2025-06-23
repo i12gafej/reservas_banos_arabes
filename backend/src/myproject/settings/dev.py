@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import logging.config  # noqa: E402
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -111,4 +112,49 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Permitimos todas las origins para simplificar en local.
 # En producción conviene limitarlo a los dominios necesarios.
-CORS_ALLOW_ALL_ORIGINS = True 
+CORS_ALLOW_ALL_ORIGINS = True
+
+# ------------------------------------------------------------------
+# Logging (muestra DEBUG de la aplicación en consola)
+# ------------------------------------------------------------------
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '[{levelname}] {asctime} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+    # Loggers específicos de la app. Ajusta el nivel según necesidades.
+    'loggers': {
+        # Todos los módulos bajo "reservations." (managers, services, etc.)
+        'reservations': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'reservations.managers.availability': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # Ajusta el nivel de Django para evitar demasiado ruido.
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+} 

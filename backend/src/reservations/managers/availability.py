@@ -1,17 +1,19 @@
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 from django.db import transaction
+from django.utils import timezone
 
 from reservations.dtos.availability import AvailabilityDTO, AvailabilityRangeDTO
 from reservations.models import Availability, AvailabilityRange
+
 
 
 class AvailabilityManager:
     """Gestor para operaciones de Availability y AvailabilityRange."""
 
     # ------------------------------------------------------------------
-    # Lectura
+    # Función auxiliar para convertir a date
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -22,7 +24,30 @@ class AvailabilityManager:
         - Si no existe, busca la Availability del día de la semana correspondiente.
         - Si no hay ninguna, devuelve lista vacía.
         """
+        def to_local_date(value: date | datetime) -> date:
+            """
+            Devuelve un objeto date en zona local:
 
+            • Si value ya es date → lo devuelve.
+            • Si value es datetime → lo convierte a zona local y devuelve .date().
+            """
+            if isinstance(value, date) and not isinstance(value, datetime):
+                return value
+            if isinstance(value, datetime):
+                if timezone.is_naive(value):
+                    value = timezone.make_aware(value, timezone.get_default_timezone())
+                return timezone.localtime(value).date()
+            raise TypeError("Se esperaba date o datetime")
+    
+    # ------------------------------------------------------------------
+    # Lectura
+    # --------------------- ---------------------------------------------
+        
+        print("target_day: %s" % target_day)
+        # 0) Convertir a date
+        target_day = to_local_date(target_day)
+        print("target_day: %s" % target_day, "weekday=%s" % target_day.isoweekday())
+        
         # 1) Availability puntual
         availability: Optional[Availability] = (
             Availability.objects
