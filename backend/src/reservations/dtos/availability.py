@@ -12,7 +12,7 @@ class AvailabilityRangeDTO:
     massagists_availability: int
 
     def validate(self) -> None:
-        if self.initial_time >= self.end_time:
+        if self.initial_time > self.end_time:
             raise ValueError("La hora inicial debe ser anterior a la hora final")
         if self.massagists_availability < 0:
             raise ValueError("La disponibilidad de masajistas no puede ser negativa")
