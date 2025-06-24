@@ -43,6 +43,14 @@ interface BookEditForm {
   amount_pending: string;
   payment_date: Date | null;
   product_id: number;
+  // Campos de masajes
+  massage60Relax: number;
+  massage60Piedra: number;
+  massage60Exfol: number;
+  massage30Relax: number;
+  massage30Piedra: number;
+  massage30Exfol: number;
+  massage15Relax: number;
 }
 
 const TIMES = Array.from({ length: 25 }, (_, i) => {
@@ -71,8 +79,40 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
   const [customLogComment, setCustomLogComment] = useState('');
 
   // React Hook Form
-  const { control, handleSubmit, reset, watch, formState: { isDirty } } = useForm<BookEditForm>();
+  const { control, handleSubmit, reset, watch, register, formState: { isDirty } } = useForm<BookEditForm>();
   const formValues = watch();
+
+  // Función para convertir product_baths a valores del formulario
+  const convertProductBathsToFormValues = (productBaths: BookDetail['product_baths']) => {
+    const massageValues = {
+      massage60Relax: 0,
+      massage60Piedra: 0,
+      massage60Exfol: 0,
+      massage30Relax: 0,
+      massage30Piedra: 0,
+      massage30Exfol: 0,
+      massage15Relax: 0,
+    };
+
+    productBaths.forEach(bath => {
+      const duration = bath.massage_duration === '0' ? '0' : bath.massage_duration;
+      const type = bath.massage_type;
+      
+      if (duration === '60') {
+        if (type === 'relax') massageValues.massage60Relax = bath.quantity;
+        else if (type === 'rock') massageValues.massage60Piedra = bath.quantity;
+        else if (type === 'exfoliation') massageValues.massage60Exfol = bath.quantity;
+      } else if (duration === '30') {
+        if (type === 'relax') massageValues.massage30Relax = bath.quantity;
+        else if (type === 'rock') massageValues.massage30Piedra = bath.quantity;
+        else if (type === 'exfoliation') massageValues.massage30Exfol = bath.quantity;
+      } else if (duration === '15') {
+        if (type === 'relax') massageValues.massage15Relax = bath.quantity;
+      }
+    });
+
+    return massageValues;
+  };
 
   // Función para obtener el color de la celda según el estado de la reserva
   const getCellColor = (book: BookRow): string => {
@@ -145,6 +185,9 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
       const detail = await getBookDetail(parseInt(book.id));
       setBookDetail(detail);
       
+      // Convertir masajes a valores del formulario
+      const massageValues = convertProductBathsToFormValues(detail.product_baths || []);
+      
       // Resetear el formulario con los datos de la reserva
       reset({
         booking_date: detail.booking_date ? new Date(detail.booking_date) : null,
@@ -156,6 +199,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
         amount_pending: detail.amount_pending || '',
         payment_date: detail.payment_date ? new Date(detail.payment_date) : null,
         product_id: detail.product_id || 1,
+        ...massageValues,
       });
       
       setShowBookDetailDialog(true);
@@ -181,6 +225,23 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Función para verificar si los masajes han cambiado
+  const checkMassageChanges = () => {
+    if (!bookDetail || !formValues) return false;
+    
+    const currentMassages = convertProductBathsToFormValues(bookDetail.product_baths || []);
+    
+    return (
+      formValues.massage60Relax !== currentMassages.massage60Relax ||
+      formValues.massage60Piedra !== currentMassages.massage60Piedra ||
+      formValues.massage60Exfol !== currentMassages.massage60Exfol ||
+      formValues.massage30Relax !== currentMassages.massage30Relax ||
+      formValues.massage30Piedra !== currentMassages.massage30Piedra ||
+      formValues.massage30Exfol !== currentMassages.massage30Exfol ||
+      formValues.massage15Relax !== currentMassages.massage15Relax
+    );
   };
 
   // Función para generar vista previa de cambios
@@ -212,6 +273,9 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
     }
     if (formValues.product_id !== bookDetail.product_id) {
       changes.push('Producto/masajes modificados');
+    }
+    if (checkMassageChanges()) {
+      changes.push('Los masajes han sido modificados');
     }
     
     return changes.length > 0 ? changes.join('. ') : 'Sin cambios detectados';
@@ -461,20 +525,47 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                 </form>
               </div>
 
-              {/* Matriz de masajes */}
+              {/* Tabla de masajes editable */}
               <div className="book-dialog-section book-section-masajes">
-                <h3>Masajes Incluidos</h3>
-                {bookDetail.product_baths && bookDetail.product_baths.length > 0 ? (
-                  <div>
-                    {bookDetail.product_baths.map((bath, index) => (
-                      <div key={index} className="book-massage-item">
-                        <strong>{bath.name}</strong> - {bath.massage_type} ({bath.massage_duration}min) x{bath.quantity}
-                      </div>
+                <h3>Reserva Masaje</h3>
+                <table style={{ width: '100%', textAlign: 'center', fontSize: '0.7rem' }}>
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>RELAX</th>
+                      <th>PIEDRA</th>
+                      <th>EXFOL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[60, 30, 15].map((dur) => (
+                      <tr key={dur}>
+                        <td style={{ fontWeight: 'bold' }}>{dur}&apos;</td>
+                        {['Relax', 'Piedra', 'Exfol'].map((tipo) => {
+                          const nameKey = (`massage${dur}${tipo}` as keyof BookEditForm);
+                          if (dur === 15 && tipo !== 'Relax') {
+                            return <td key={tipo}></td>;
+                          }
+                          return (
+                            <td key={tipo}>
+                              <input 
+                                type="number" 
+                                min={0} 
+                                {...register(nameKey as any)} 
+                                style={{ 
+                                  width: '50px', 
+                                  fontSize: '0.7rem',
+                                  padding: '0.2rem',
+                                  textAlign: 'center'
+                                }} 
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
                     ))}
-                  </div>
-                ) : (
-                  <p>No hay masajes incluidos</p>
-                )}
+                  </tbody>
+                </table>
               </div>
 
               {/* Sección de pago */}
