@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 
 from django.db import transaction
@@ -126,17 +126,23 @@ class AvailabilityManager:
             if i == 0:
                 # Primera disponibilidad: desde el pasado hasta la siguiente fecha
                 if len(all_availabilities) > 1:
-                    next_date = all_availabilities[1].created_at.date()
-                    temporal_range = f"Del pasado hasta {next_date.strftime('%d-%m-%Y')}"
+                    next_date = timezone.localtime(all_availabilities[1].created_at).date()
+                    # Usar el día anterior para "hasta"
+                    previous_date = next_date - timedelta(days=1)
+                    temporal_range = f"Del pasado hasta {previous_date.strftime('%d-%m-%Y')}"
                 else:
                     temporal_range = "Del pasado en adelante"
             elif i == len(all_availabilities) - 1:
                 # Última disponibilidad: desde su fecha en adelante
-                temporal_range = f"Del {av.created_at.date().strftime('%d-%m-%Y')} en adelante"
+                current_date = timezone.localtime(av.created_at).date()
+                temporal_range = f"Del {current_date.strftime('%d-%m-%Y')} en adelante"
             else:
                 # Disponibilidad intermedia: entre dos fechas
-                next_date = all_availabilities[i + 1].created_at.date()
-                temporal_range = f"Del {av.created_at.date().strftime('%d-%m-%Y')} al {next_date.strftime('%d-%m-%Y')}"
+                next_date = timezone.localtime(all_availabilities[i + 1].created_at).date()
+                # Usar el día anterior para "hasta"
+                previous_date = next_date - timedelta(days=1)
+                current_date = timezone.localtime(av.created_at).date()
+                temporal_range = f"Del {current_date.strftime('%d-%m-%Y')} al {previous_date.strftime('%d-%m-%Y')}"
             
             history.append({
                 'id': av.id,
@@ -184,6 +190,43 @@ class AvailabilityManager:
 
     @staticmethod
     @transaction.atomic
+    def create_new_weekday_availability_version(
+        weekday: int,
+        ranges: List[AvailabilityRangeDTO],
+        effective_date: Optional[date] = None
+    ) -> Availability:
+        """Crea una nueva versión de disponibilidad para un día de la semana.
+        
+        Args:
+            weekday: El día de la semana (1=Lunes, 2=Martes, ..., 7=Domingo)
+            ranges: Los rangos horarios de la nueva disponibilidad
+            effective_date: Fecha efectiva (si no se proporciona, usa hoy)
+        """
+        if effective_date is None:
+            effective_date = timezone.now().date()
+        
+        # Crear la nueva disponibilidad por weekday
+        # Usar timezone.localtime() para mantener en zona horaria local
+        local_datetime = timezone.localtime(
+            timezone.make_aware(
+                datetime.combine(effective_date, datetime.min.time())
+            )
+        )
+        
+        availability = Availability.objects.create(
+            type=AvailabilityDTO.TYPE_WEEKDAY,
+            weekday=weekday,
+            punctual_day=None,
+            created_at=local_datetime
+        )
+        
+        # Crear los rangos
+        AvailabilityManager._create_related_ranges(availability, ranges)
+        
+        return availability
+
+    @staticmethod
+    @transaction.atomic
     def create_new_availability_version(
         target_day: date,
         ranges: List[AvailabilityRangeDTO],
@@ -203,13 +246,18 @@ class AvailabilityManager:
         weekday = target_day.isoweekday()
         
         # Crear la nueva disponibilidad
+        # Usar timezone.localtime() para mantener en zona horaria local
+        local_datetime = timezone.localtime(
+            timezone.make_aware(
+                datetime.combine(effective_date, datetime.min.time())
+            )
+        )
+        
         availability = Availability.objects.create(
             type=AvailabilityDTO.TYPE_PUNCTUAL,
             punctual_day=target_day,
             weekday=None,
-            created_at=timezone.make_aware(
-                datetime.combine(effective_date, datetime.min.time())
-            )
+            created_at=local_datetime
         )
         
         # Crear los rangos

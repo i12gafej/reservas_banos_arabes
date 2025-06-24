@@ -181,3 +181,58 @@ class AvailabilityViewSet(viewsets.ViewSet):
                 {"detail": f"Error al crear nueva versión: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=["post"], url_path="create-weekday-version")
+    def create_weekday_version(self, request):
+        """Crea una nueva versión de disponibilidad para un día de la semana."""
+        try:
+            weekday = request.data.get("weekday")
+            ranges_data = request.data.get("ranges", [])
+            effective_date_str = request.data.get("effective_date")
+            
+            if weekday is None:
+                return Response(
+                    {"detail": "Se requiere weekday"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not isinstance(weekday, int) or weekday < 1 or weekday > 7:
+                return Response(
+                    {"detail": "weekday debe ser un número entre 1 y 7"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Convertir fecha efectiva
+            effective_date = None
+            if effective_date_str:
+                effective_date = date.fromisoformat(effective_date_str)
+            
+            # Convertir rangos a DTOs
+            from reservations.dtos.availability import AvailabilityRangeDTO
+            ranges = []
+            for r in ranges_data:
+                ranges.append(AvailabilityRangeDTO(
+                    initial_time=r["initial_time"],
+                    end_time=r["end_time"],
+                    massagists_availability=r["massagists_availability"]
+                ))
+            
+            # Crear nueva versión por weekday
+            new_availability = AvailabilityManager.create_new_weekday_availability_version(
+                weekday, ranges, effective_date
+            )
+            
+            # Devolver la disponibilidad creada
+            output = AvailabilitySerializer(self._model_to_payload(new_availability)).data
+            return Response(output, status=status.HTTP_201_CREATED)
+            
+        except ValueError as e:
+            return Response(
+                {"detail": f"Error en formato de datos: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Error al crear nueva versión por weekday: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

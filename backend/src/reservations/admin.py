@@ -6,7 +6,7 @@ from .models import (
     Admin, Agent, Client, GiftVoucher,
     Product, BathType, HostingType, Availability, AvailabilityRange, Capacity,
     Book, ProductBaths, ProductHosting,
-    WebBooking
+    WebBooking, BookLogs, Constraint, ConstraintRange
 )
 from django.db import models
 from django import forms
@@ -500,8 +500,79 @@ class AvailabilityRangeAdmin(admin.ModelAdmin):
 @admin.register(Capacity)
 class CapacityAdmin(admin.ModelAdmin):
     list_display = ('value',)
+    readonly_fields = ('value',)
 
     def has_add_permission(self, request):
         # Permitir «Añadir» solo si no existe ningún registro
         return not Capacity.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        # No permitir eliminar el único registro de aforo
+        return False
+
+
+# ============================================================================
+# LOGS Y RESTRICCIONES - NUEVOS MODELOS
+# ============================================================================
+
+@admin.register(BookLogs)
+class BookLogsAdmin(admin.ModelAdmin):
+    list_display = ('book', 'datetime', 'comment_preview')
+    list_filter = ('datetime', 'book__book_date')
+    search_fields = ('book__internal_order_id', 'comment')
+    readonly_fields = ('datetime',)
+    ordering = ('-datetime',)
+    autocomplete_fields = ['book']
+
+    def comment_preview(self, obj):
+        return obj.comment[:50] + '...' if len(obj.comment) > 50 else obj.comment
+    comment_preview.short_description = "Comentario"
+
+    fieldsets = (
+        ('Información del Log', {
+            'fields': ('book', 'datetime', 'comment')
+        }),
+    )
+
+
+class ConstraintRangeInline(admin.TabularInline):
+    model = ConstraintRange
+    extra = 1
+    verbose_name = "Rango de Restricción"
+    verbose_name_plural = "Rangos de Restricción"
+
+
+@admin.register(Constraint)
+class ConstraintAdmin(admin.ModelAdmin):
+    list_display = ('day', 'created_at', 'ranges_count')
+    list_filter = ('day', 'created_at')
+    search_fields = ('day',)
+    readonly_fields = ('created_at',)
+    ordering = ('day',)
+    inlines = [ConstraintRangeInline]
+
+    def ranges_count(self, obj):
+        return obj.constraintrange_set.count()
+    ranges_count.short_description = "Rangos de restricción"
+
+    fieldsets = (
+        ('Información de la Restricción', {
+            'fields': ('day', 'created_at')
+        }),
+    )
+
+
+@admin.register(ConstraintRange)
+class ConstraintRangeAdmin(admin.ModelAdmin):
+    list_display = ('constraint', 'initial_time', 'end_time')
+    list_filter = ('constraint__day', 'initial_time', 'end_time')
+    search_fields = ('constraint__day',)
+    autocomplete_fields = ['constraint']
+    ordering = ('constraint__day', 'initial_time')
+
+    fieldsets = (
+        ('Información del Rango', {
+            'fields': ('constraint', 'initial_time', 'end_time')
+        }),
+    )
 

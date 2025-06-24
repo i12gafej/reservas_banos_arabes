@@ -2,7 +2,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from api.v1.serializers.book import BookingSerializer
+from api.v1.serializers.book import BookingSerializer, BookLogSerializer, BookDetailSerializer
 from reservations.managers.book import BookManager
 from reservations.dtos.book import StaffBathRequestDTO, StaffBookingPayloadDTO
 
@@ -95,3 +95,70 @@ class BookViewSet(viewsets.ViewSet):
             return Response({"detail": f"Campo requerido faltante: {e.args[0]}"}, status=400)
         except Exception as e:
             return Response({"detail": f"Error al crear reserva staff: {str(e)}"}, status=400)
+
+
+
+    # ------------------------------------------------------------------
+    # Endpoints para detalles de reserva y logs
+    # NOTA: Solo se usa ID numérico, se eliminó soporte para internal_order_id
+    # ------------------------------------------------------------------
+
+    @action(detail=True, methods=["get"], url_path="detail")
+    def get_detail(self, request, pk=None):
+        """Obtiene los detalles completos de una reserva."""
+        try:
+            detail_dto = BookManager.get_book_detail(int(pk))
+            serializer = BookDetailSerializer(detail_dto)
+            return Response(serializer.data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=404)
+        except Exception as e:
+            return Response({"detail": f"Error al obtener detalles: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=["put"], url_path="detail")
+    def update_detail(self, request, pk=None):
+        """Actualiza una reserva con detalles completos y genera log automático."""
+        try:
+            # Obtener los detalles actuales
+            current_detail = BookManager.get_book_detail(int(pk))
+            
+            # Validar datos de entrada
+            serializer = BookDetailSerializer(current_detail, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            
+            # Actualizar con log automático
+            updated_detail = serializer.save()
+            
+            # Devolver detalles actualizados
+            return Response(BookDetailSerializer(updated_detail).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=404)
+        except Exception as e:
+            return Response({"detail": f"Error al actualizar reserva: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=["get"], url_path="logs")
+    def get_logs(self, request, pk=None):
+        """Obtiene todos los logs de una reserva."""
+        try:
+            book_id = int(pk)
+            log_dtos = BookManager.get_book_logs(book_id)
+            serializer = BookLogSerializer(log_dtos, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"detail": f"Error al obtener logs: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=["post"], url_path="logs")
+    def create_log(self, request, pk=None):
+        """Crea un nuevo log para una reserva."""
+        try:
+            book_id = int(pk)
+            data = request.data.copy()
+            data['book_id'] = book_id
+            
+            serializer = BookLogSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            log_dto = serializer.save()
+            
+            return Response(BookLogSerializer(log_dto).data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"detail": f"Error al crear log: {str(e)}"}, status=400)

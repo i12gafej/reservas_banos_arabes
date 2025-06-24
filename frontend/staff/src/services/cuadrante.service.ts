@@ -98,7 +98,17 @@ export interface Booking {
   created_at?: string;
 }
 
+export interface Client {
+  id: number;
+  name: string;
+  surname: string;
+  phone_number: string;
+  email: string;
+  created_at: string;
+}
+
 const BOOKING_ENDPOINT = `${BASE_URL}/reservas/`;
+const CLIENT_ENDPOINT = `${BASE_URL}/clientes/`;
 
 /** Obtiene todas las reservas */
 export async function getBookings(): Promise<Booking[]> {
@@ -108,6 +118,11 @@ export async function getBookings(): Promise<Booking[]> {
 /** Obtiene reservas por fecha específica */
 export async function getBookingsByDate(date: string): Promise<Booking[]> {
   return http<Booking[]>(`${BOOKING_ENDPOINT}by-date/?date=${date}`);
+}
+
+/** Obtiene información de un cliente por ID */
+export async function getClientById(clientId: number): Promise<Client> {
+  return http<Client>(`${CLIENT_ENDPOINT}${clientId}/`);
 }
 
 export type BookingCreate = Omit<Booking, 'id' | 'internal_order_id' | 'created_at'>;

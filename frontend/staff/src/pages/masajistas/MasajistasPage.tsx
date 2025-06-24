@@ -8,10 +8,31 @@ import {
   getAvailabilityHistory,
   getAvailabilityById,
   createAvailabilityVersion,
+  createWeekdayAvailabilityVersion,
 } from '@/services/masajistas.service';
 import './masajistas.css';
 import ReactiveButton from 'reactive-button';
 import { toLocalISODate } from '@/utils/date';
+
+// Función auxiliar para obtener una fecha específica de un weekday
+function getDateForWeekday(weekday: number): Date {
+  const today = new Date();
+  const currentWeekday = today.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  const targetWeekday = weekday === 7 ? 0 : weekday; // Convertir 7=Domingo a 0
+  
+  // Calcular días de diferencia
+  let daysDiff = targetWeekday - currentWeekday;
+  if (daysDiff <= 0) {
+    daysDiff += 7; // Ir al próximo día de la semana
+  }
+  
+  // Crear nueva fecha
+  const targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + daysDiff);
+  
+  // Asegurar que la fecha esté en zona local
+  return new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+}
 
 const TIMES = Array.from({ length: 25 }, (_, i) => {
   const minutes = 10 * 60 + i * 30;
@@ -181,10 +202,9 @@ const MasajistasPage: React.FC = () => {
         
         for (const weekday of selectedWeekdays) {
           console.log('[Masajistas] 📅 Cargando weekday:', weekday);
-          // Simular día para obtener disponibilidad
-          const tempDate = new Date();
-          const weekdayToDate = new Date(tempDate.setDate(tempDate.getDate() + (((weekday - 1 - (tempDate.getDay() + 6) % 7) + 7) % 7)));
-          const iso = toLocalISODate(weekdayToDate);
+          // Obtener fecha específica para este weekday
+          const weekdayDate = getDateForWeekday(weekday);
+          const iso = toLocalISODate(weekdayDate);
           
           try {
             // Obtener historial de disponibilidades
@@ -368,11 +388,7 @@ const MasajistasPage: React.FC = () => {
       } else if (pendingSave === 'weekday') {
         // Crear nueva versión para cada día seleccionado
         for (const weekday of selectedWeekdays) {
-          // Simular día para obtener la fecha
-          const tempDate = new Date();
-          const weekdayToDate = new Date(tempDate.setDate(tempDate.getDate() + (((weekday - 1 - (tempDate.getDay() + 6) % 7) + 7) % 7)));
-          
-          await createAvailabilityVersion(weekdayToDate, ranges, today);
+          await createWeekdayAvailabilityVersion(weekday, ranges, today);
         }
       }
     } catch (err) {
@@ -621,18 +637,18 @@ const MasajistasPage: React.FC = () => {
       >
         {pendingSave === 'weekday' ? (
           <div>
-            <p>
+          <p>
               Si guardas esta disponibilidad, se aplicarán los cambios a partir del día de hoy,{' '}
               {new Date().toLocaleDateString('es-ES')}.
-            </p>
+          </p>
             <p>¿Quieres modificar la disponibilidad de masajistas para los días: {selectedWeekdays.map(w => weekdayNames[w - 1]).join(', ')}?</p>
           </div>
         ) : (
           <div>
-            <p>
+          <p>
               Si guardas esta disponibilidad, se aplicarán los cambios a partir del día de hoy,{' '}
               {new Date().toLocaleDateString('es-ES')}.
-            </p>
+          </p>
             <p>¿Quieres modificar la disponibilidad de masajistas para las fechas: {selectedDates.map(d => d.toLocaleDateString('es-ES')).join(', ')}?</p>
           </div>
         )}

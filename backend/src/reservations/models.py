@@ -275,3 +275,47 @@ class Capacity(models.Model):
     def __str__(self):
         return str(self.value)
 
+class BookLogs(models.Model):
+    """Modelo para registrar cambios en las reservas."""
+    
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, verbose_name="Reserva")
+    datetime = models.DateTimeField(default=timezone.now, verbose_name="Fecha y hora del log")
+    comment = models.TextField(verbose_name="Comentario del log")
+
+    class Meta:
+        verbose_name = "Log de Reserva"
+        verbose_name_plural = "Logs de Reservas"
+        ordering = ['-datetime']
+
+    def __str__(self):
+        return f"Log de {self.book.internal_order_id} - {self.datetime.strftime('%d/%m/%Y %H:%M')}"
+
+class Constraint(models.Model):
+    """Modelo para restricciones de reservas en días específicos."""
+    
+    day = models.DateField(verbose_name="Día de restricción")
+    created_at = models.DateTimeField(default=timezone.now, verbose_name="Fecha de creación")
+
+    class Meta:
+        verbose_name = "Restricción"
+        verbose_name_plural = "Restricciones"
+        ordering = ['day']
+
+    def __str__(self):
+        return f"Restricción para {self.day.strftime('%d/%m/%Y')}"
+
+class ConstraintRange(models.Model):
+    """Modelo para rangos de restricción dentro de un día."""
+    
+    initial_time = models.TimeField(verbose_name="Hora inicial")
+    end_time = models.TimeField(verbose_name="Hora final")
+    constraint = models.ForeignKey(Constraint, on_delete=models.CASCADE, verbose_name="Restricción")
+
+    class Meta:
+        verbose_name = "Rango de Restricción"
+        verbose_name_plural = "Rangos de Restricción"
+        ordering = ['initial_time']
+
+    def __str__(self):
+        return f"{self.initial_time} - {self.end_time}"
+

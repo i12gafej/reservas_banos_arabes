@@ -1,0 +1,349 @@
+.book-grid {
+  margin: 1rem 0;
+}
+
+.book-grid table {
+  border-collapse: collapse;
+  width: max-content;
+  table-layout: fixed;
+  font-size: 11px;
+}
+
+.book-grid th,
+.book-grid td {
+  border: 1px solid #c0c0c0;
+  padding: 1px 2px;
+  text-align: center;
+  min-width: var(--col-width, 20px);
+  height: 20px;
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.book-grid .sortable-header {
+  cursor: pointer;
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+.book-grid .sortable-header:hover {
+  background-color: #e0e0e0;
+}
+
+
+
+.book-grid .client-col {
+  width: 150px;
+  background: #f5f5f5;
+  
+  padding: 1px 4px;
+}
+
+.book-grid .client-col td {
+  text-align: left;
+  color: #000000;
+}
+
+.book-grid .client-col th {
+  text-align: center;
+}
+
+.book-grid .time-col {
+  width: 80px;
+  background: #fafafa;
+  font-weight: 500;
+}
+
+/* Estilos para las celdas con valores */
+.book-grid .time-cell[style*="background-color"] {
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  color: #000000;
+}
+
+/* Estilos para el contenido del diálogo */
+.book-dialog-content {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  max-height: 85vh;
+  overflow: visible;
+}
+
+.book-dialog-content h3 {
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 0.3rem;
+}
+
+.book-dialog-section {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.book-dialog-section p {
+  margin: 0.15rem 0;
+  font-size: 0.7rem;
+}
+
+.book-dialog-section strong {
+  font-weight: 600;
+  color: #555;
+}
+
+/* Layout grid principal del diálogo */
+.book-dialog-main-grid {
+  display: grid;
+  grid-template-columns: 280px 280px 120px;
+  grid-template-rows: auto auto auto;
+  gap: 0.75rem;
+  grid-template-areas: 
+    "cliente creador registros"
+    "datos masajes masajes"
+    "pago pago pago";
+}
+
+.book-section-cliente {
+  grid-area: cliente;
+}
+
+.book-section-creador {
+  grid-area: creador;
+}
+
+.book-section-registros {
+  grid-area: registros;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.book-section-datos {
+  grid-area: datos;
+}
+
+.book-section-masajes {
+  grid-area: masajes;
+}
+
+.book-section-pago {
+  grid-area: pago;
+}
+
+.book-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.book-form-grid-single {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 
+    "fecha comentarios"
+    "hora comentarios" 
+    "personas comentarios";
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.book-form-field-fecha {
+  grid-area: fecha;
+}
+
+.book-form-field-hora {
+  grid-area: hora;
+}
+
+.book-form-field-personas {
+  grid-area: personas;
+}
+
+.book-custom-comment {
+  grid-area: comentarios;
+  display: flex;
+  flex-direction: column;
+}
+
+.book-form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.book-form-field label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-bottom: 0.1rem;
+  color: #555;
+}
+
+.book-form-field input,
+.book-form-field select,
+.book-form-field textarea {
+  padding: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  transition: border-color 0.2s;
+  height: 24px;
+  line-height: 1;
+  max-width: 100px;
+}
+
+.book-form-field input{
+  height: 18px;
+}
+
+
+
+.book-form-field input:focus,
+.book-form-field select:focus,
+.book-form-field textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.book-form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.book-form-field.book-form-field-date input{
+  max-height: 20px !important;
+  max-width: 100px;
+}
+
+.book-form-field.book-form-field-hour {
+  max-height: 30px !important;
+  margin-top: 0;
+  max-width: 110px;
+}
+
+.book-form-field.book-form-field-comment{
+  height: 90px !important;
+  width: 90% !important;
+}
+
+.book-massage-item {
+  margin: 0.25rem 0;
+  padding: 0.3rem;
+  background-color: #f0f8ff;
+  border-radius: 3px;
+  border-left: 3px solid #007bff;
+  font-size: 0.65rem;
+}
+
+.book-massage-item strong {
+  color: #007bff;
+}
+
+.book-dialog-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.book-dialog-button {
+  min-width: 80px;
+  font-size: 0.7rem;
+}
+
+.book-logs-container {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.book-log-item {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+}
+
+.book-log-date {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #007bff;
+  margin-bottom: 0.25rem;
+}
+
+.book-log-comment {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #555;
+  line-height: 1.3;
+}
+
+.book-change-preview {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #28a745;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+
+
+.book-custom-comment label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-bottom: 0.1rem;
+  color: #555;
+}
+
+.book-custom-comment textarea {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  resize: vertical;
+  height: 50px;
+}
+
+/* Estilos para el contenedor de fecha de pago */
+.payment-date-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.payment-date-picker {
+  flex: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .book-grid {
+    font-size: 0.8rem;
+  }
+  
+  .book-grid th,
+  .book-grid td {
+    padding: 4px;
+  }
+  
+  .book-grid .time-cell {
+    min-width: 30px;
+    height: 25px;
+  }
+
+  .book-form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .book-dialog-buttons {
+    flex-direction: column;
+  }
+} 

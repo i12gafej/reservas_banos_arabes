@@ -9,3 +9,7 @@
   border-radius: 4px;
   font-size: 0.9rem;
 } 
+
+.react-datepicker-popper {
+  z-index: 9999 !important;
+}

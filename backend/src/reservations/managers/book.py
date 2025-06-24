@@ -13,8 +13,8 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from reservations.dtos.book import BookDTO, StaffBathRequestDTO
-from reservations.models import Book, Product, BathType, ProductBaths, Client
+from reservations.dtos.book import BookDTO, StaffBathRequestDTO, BookLogDTO, BookDetailDTO
+from reservations.models import Book, Product, BathType, ProductBaths, Client, BookLogs, Admin, Agent, GiftVoucher, WebBooking
 
 
 class BookManager:
@@ -245,3 +245,217 @@ class BookManager:
             product=product,
         )
         return BookManager._to_dto(book)
+
+    # ------------------------------------------------------------------
+    # Gestión de BookLogs
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _booklog_to_dto(log: BookLogs) -> BookLogDTO:
+        """Convierte un modelo BookLogs en BookLogDTO."""
+        return BookLogDTO(
+            id=log.id,
+            book_id=log.book_id,
+            datetime=log.datetime,
+            comment=log.comment,
+        )
+
+    @staticmethod
+    def get_book_logs(book_id: int) -> List[BookLogDTO]:
+        """Obtiene todos los logs de una reserva."""
+        logs = BookLogs.objects.filter(book_id=book_id).order_by('-datetime')
+        return [BookManager._booklog_to_dto(log) for log in logs]
+
+    @staticmethod
+    @transaction.atomic
+    def create_book_log(dto: BookLogDTO) -> BookLogDTO:
+        """Crea un nuevo log para una reserva."""
+        dto.validate_for_create()
+        log = BookLogs.objects.create(
+            book_id=dto.book_id,
+            comment=dto.comment,
+        )
+        return BookManager._booklog_to_dto(log)
+
+    # ------------------------------------------------------------------
+    # Obtener detalles completos de una reserva
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_book_detail_dto(book: Book) -> BookDetailDTO:
+        """Construye un BookDetailDTO a partir de un objeto Book."""
+        # Obtener información del creador
+        creator_type_name = "Sin creador"
+        creator_name = "Sin creador"
+        
+        if book.creator_type and book.creator_id:
+            try:
+                model_class = book.creator_type.model_class()
+                creator_obj = model_class.objects.get(id=book.creator_id)
+                
+                if isinstance(creator_obj, Admin):
+                    creator_type_name = "Administrador"
+                    creator_name = f"{creator_obj.name} {creator_obj.surname}"
+                elif isinstance(creator_obj, Agent):
+                    creator_type_name = "Agente"
+                    creator_name = creator_obj.name
+                elif isinstance(creator_obj, GiftVoucher):
+                    creator_type_name = "Cheque regalo"
+                    creator_name = f"Vale #{creator_obj.code} - {creator_obj.gift_name}"
+                elif isinstance(creator_obj, WebBooking):
+                    creator_type_name = "Reserva web"
+                    creator_name = f"Reserva web #{creator_obj.id}"
+            except Exception:
+                # Si hay error al obtener el creador, mantener valores por defecto
+                pass
+
+        # Obtener información de los baños del producto
+        product_baths = []
+        if book.product:
+            for product_bath in book.product.baths.select_related('bath_type').all():
+                product_baths.append({
+                    'massage_type': product_bath.bath_type.massage_type,
+                    'massage_duration': product_bath.bath_type.massage_duration,
+                    'quantity': product_bath.quantity,
+                    'name': product_bath.bath_type.name,
+                    'price': str(product_bath.bath_type.price),
+                })
+
+        return BookDetailDTO(
+            id=book.id,
+            internal_order_id=book.internal_order_id,
+            booking_date=book.book_date,
+            hour=book.hour,
+            people=book.people,
+            comment=book.comment,
+            amount_paid=book.amount_paid,
+            amount_pending=book.amount_pending,
+            payment_date=book.payment_date,
+            checked_in=book.checked_in,
+            checked_out=book.checked_out,
+            client_id=book.client_id,
+            product_id=book.product_id,
+            created_at=book.created_at,
+            client_name=book.client.name,
+            client_surname=book.client.surname or "",
+            client_phone=book.client.phone_number or "",
+            client_email=book.client.email or "",
+            client_created_at=book.client.created_at,
+            creator_type_name=creator_type_name,
+            creator_name=creator_name,
+            product_baths=product_baths,
+        )
+
+    @staticmethod
+    def get_book_detail(book_id: int) -> BookDetailDTO:
+        """Obtiene los detalles completos de una reserva incluyendo cliente y creador."""
+        try:
+            book = Book.objects.select_related('client', 'product', 'creator_type').get(id=book_id)
+        except Book.DoesNotExist:
+            raise ValueError(f"Reserva con ID {book_id} no encontrada")
+        
+        return BookManager._build_book_detail_dto(book)
+
+
+
+    # ------------------------------------------------------------------
+    # Generar mensaje de log automático para cambios
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def generate_change_log_message(original_data: dict, new_data: dict) -> str:
+        """Genera automáticamente el mensaje de log basado en los cambios realizados."""
+        messages = []
+
+        # Cambio de fecha
+        if original_data.get('booking_date') != new_data.get('booking_date'):
+            old_date = original_data.get('booking_date', 'No especificada')
+            new_date = new_data.get('booking_date', 'No especificada')
+            messages.append(f"Fecha modificada del día {old_date} al día {new_date}")
+
+        # Cambio de hora
+        if original_data.get('hour') != new_data.get('hour'):
+            old_hour = original_data.get('hour', 'No especificada')
+            new_hour = new_data.get('hour', 'No especificada')
+            messages.append(f"Hora modificada de {old_hour} a {new_hour}")
+
+        # Cambio de personas
+        if original_data.get('people') != new_data.get('people'):
+            old_people = original_data.get('people', 0)
+            new_people = new_data.get('people', 0)
+            messages.append(f"Pasa de {old_people} a {new_people} personas")
+
+        # Cambio de fecha de pago
+        if original_data.get('payment_date') != new_data.get('payment_date'):
+            old_payment = original_data.get('payment_date', 'Sin fecha')
+            new_payment = new_data.get('payment_date', 'Sin fecha')
+            messages.append(f"La fecha de pago cambia de {old_payment} a {new_payment}")
+
+        # Cambio de importe pagado
+        if original_data.get('amount_paid') != new_data.get('amount_paid'):
+            old_paid = original_data.get('amount_paid', 0)
+            new_paid = new_data.get('amount_paid', 0)
+            messages.append(f"El importe pagado cambia de €{old_paid} a €{new_paid}")
+
+        # Cambio de importe pendiente
+        if original_data.get('amount_pending') != new_data.get('amount_pending'):
+            old_pending = original_data.get('amount_pending', 0)
+            new_pending = new_data.get('amount_pending', 0)
+            messages.append(f"El importe a deber cambia de €{old_pending} a €{new_pending}")
+
+        # Comparar masajes (esto requiere lógica más compleja para productos)
+        # Por ahora lo dejamos simple, se podría extender más adelante
+        if original_data.get('product_id') != new_data.get('product_id'):
+            messages.append("Producto/masajes modificados")
+
+        return ". ".join(messages) if messages else "Sin cambios detectados"
+
+    # ------------------------------------------------------------------
+    # Actualización con log automático
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    @transaction.atomic
+    def update_booking_with_log(dto: BookDTO, log_comment: str = None) -> BookDTO:
+        """Actualiza una reserva y crea un log automático de los cambios."""
+        # Obtener datos originales
+        original_book = Book.objects.get(id=dto.id)
+        original_data = {
+            'booking_date': original_book.book_date,
+            'hour': original_book.hour,
+            'people': original_book.people,
+            'amount_paid': original_book.amount_paid,
+            'amount_pending': original_book.amount_pending,
+            'payment_date': original_book.payment_date,
+            'product_id': original_book.product_id,
+        }
+
+        # Actualizar reserva
+        updated_dto = BookManager.update_booking(dto)
+
+        # Preparar datos nuevos para comparación
+        new_data = {
+            'booking_date': dto.booking_date,
+            'hour': dto.hour,
+            'people': dto.people,
+            'amount_paid': dto.amount_paid,
+            'amount_pending': dto.amount_pending,
+            'payment_date': dto.payment_date,
+            'product_id': dto.product_id,
+        }
+
+        # Generar mensaje de log automático o usar el proporcionado
+        if log_comment:
+            log_message = log_comment
+        else:
+            log_message = BookManager.generate_change_log_message(original_data, new_data)
+
+        # Crear log si hay cambios
+        if log_message and log_message != "Sin cambios detectados":
+            log_dto = BookLogDTO(
+                book_id=dto.id,
+                comment=log_message,
+            )
+            BookManager.create_book_log(log_dto)
+
+        return updated_dto

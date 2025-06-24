@@ -5,15 +5,17 @@ export interface TimeGridRowProps {
   /** Etiqueta mostrada en la primera columna */
   label: React.ReactNode;
   /** Array de valores a mostrar en cada intervalo (misma longitud que times) */
-  values?: (string | number | React.ReactNode)[];
+  values?: (string | number | React.ReactNode | boolean)[];
   /** Tiempo generado por TimeGrid */
   times: string[];
   /** Indica si la fila es editable */
   editable?: boolean;
+  /** Indica si la fila usa checkboxes */
+  checkboxRow?: boolean;
   /** Callback cuando cambia la selección (solo editable) */
   onSelectionChange?: (indices: number[]) => void;
   /** Callback para actualizar valores; recibe nuevo array completo */
-  onValuesChange?: (newValues: (string | number | React.ReactNode)[]) => void;
+  onValuesChange?: (newValues: (string | number | React.ReactNode | boolean)[]) => void;
 }
 
 export interface TimeGridRowHandle {
@@ -28,6 +30,7 @@ const TimeGridRow = forwardRef<TimeGridRowHandle, TimeGridRowProps>(({
   values = [],
   times,
   editable = false,
+  checkboxRow = false,
   onSelectionChange,
   onValuesChange,
 }, ref) => {
@@ -101,8 +104,26 @@ const TimeGridRow = forwardRef<TimeGridRowHandle, TimeGridRowProps>(({
     if (!editable || selected.size === 0 || !onValuesChange) return;
     const newVals = [...values];
     selected.forEach((idx) => {
-      if (kind === 'zero') newVals[idx] = 0;
-      else if (kind === 'custom') newVals[idx] = value;
+      if (checkboxRow) {
+        // Para filas de checkbox, toggleamos el valor
+        newVals[idx] = !Boolean(newVals[idx]);
+      } else if (kind === 'zero') {
+        newVals[idx] = 0;
+      } else if (kind === 'custom') {
+        newVals[idx] = value;
+      }
+    });
+    onValuesChange(newVals);
+  };
+
+  // --------------------------------------------------------------
+  // Toggle checkbox para celdas seleccionadas
+  // --------------------------------------------------------------
+  const toggleSelectedCheckboxes = () => {
+    if (!checkboxRow || !editable || selected.size === 0 || !onValuesChange) return;
+    const newVals = [...values];
+    selected.forEach((idx) => {
+      newVals[idx] = !Boolean(newVals[idx]);
     });
     onValuesChange(newVals);
   };
@@ -127,7 +148,10 @@ const TimeGridRow = forwardRef<TimeGridRowHandle, TimeGridRowProps>(({
       const tag = (e.target as HTMLElement).tagName.toLowerCase();
       if (['input', 'textarea', 'select'].includes(tag)) return;
 
-      if (e.key >= '0' && e.key <= '9') {
+      if (checkboxRow && e.key === 'Enter') {
+        e.preventDefault();
+        toggleSelectedCheckboxes();
+      } else if (!checkboxRow && e.key >= '0' && e.key <= '9') {
         const num = Number(e.key);
         const newVals = [...values];
         selected.forEach((idx) => (newVals[idx] = num));
@@ -137,7 +161,7 @@ const TimeGridRow = forwardRef<TimeGridRowHandle, TimeGridRowProps>(({
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [selected, values, editable, onValuesChange]);
+  }, [selected, values, editable, onValuesChange, checkboxRow]);
 
   return (
     <tr
@@ -151,12 +175,33 @@ const TimeGridRow = forwardRef<TimeGridRowHandle, TimeGridRowProps>(({
 
       {/* Celulas */}
       {times.map((t, idx) => {
-        const content = values[idx] ?? '';
+        const rawValue = values[idx];
         const isSel = selected.has(idx);
+        
+        let content: React.ReactNode;
+        if (checkboxRow) {
+          const isChecked = Boolean(rawValue);
+          content = (
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => {
+                if (!editable || !onValuesChange) return;
+                const newVals = [...values];
+                newVals[idx] = !isChecked;
+                onValuesChange(newVals);
+              }}
+              style={{ pointerEvents: editable ? 'auto' : 'none' }}
+            />
+          );
+        } else {
+          content = rawValue ?? '';
+        }
+        
         return (
           <td
             key={t}
-            className={`tg-cell ${isSel ? 'tg-cell-selected' : ''}`}
+            className={`tg-cell ${isSel ? 'tg-cell-selected' : ''} ${checkboxRow ? 'tg-cell-checkbox' : ''}`}
             onMouseDown={(e) => {
               if (e.button !== 0) return; // left click only
               if (selected.size > 0 && !isSelectingRef.current && !editable) return;
@@ -169,7 +214,7 @@ const TimeGridRow = forwardRef<TimeGridRowHandle, TimeGridRowProps>(({
             onMouseEnter={() => extendSelect(idx)}
             onMouseUp={endSelect}
             onDoubleClick={() => {
-              if (!editable) return;
+              if (!editable || checkboxRow) return;
               // si la celda doble clic ya está seleccionada, usamos conjunto actual; sino solo esa
               const targetSet = selected.has(idx) ? selected : new Set([idx]);
               if (targetSet.size === 0) return;

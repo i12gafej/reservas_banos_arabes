@@ -5,8 +5,10 @@ import { useForm, Controller } from 'react-hook-form';
 import PhoneInput from 'react-phone-input-2';
 import esLocale from 'react-phone-input-2/lang/es.json';
 import 'react-phone-input-2/lib/style.css';
-import { getCapacity, updateCapacity, Capacity, createStaffBooking, StaffBath, calculateCuadrante, CuadranteCalculated } from '@/services/cuadrante.service';
+import { getCapacity, updateCapacity, Capacity, createStaffBooking, StaffBath, calculateCuadrante, CuadranteCalculated, getBookingsByDate, Booking, getClientById, Client } from '@/services/cuadrante.service';
+import { getConstraintByDate, saveConstraintForDate, constraintRangesToCells, Constraint } from '@/services/restricciones.service';
 import TimeGrid from '@/components/timetable/TimeGrid';
+import BookGrid, { BookRow } from '@/components/timetable/BookGrid';
 import './cuadrante.css';
 import { toLocalISODate } from '@/utils/date';
 
@@ -20,6 +22,12 @@ const CuadrantePage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [cuadranteData, setCuadranteData] = useState<CuadranteCalculated | null>(null);
   const [loadingCuadrante, setLoadingCuadrante] = useState(false);
+  const [bookings, setBookings] = useState<BookRow[]>([]);
+  
+  // Restricciones
+  const [constraintCells, setConstraintCells] = useState<boolean[]>(Array(25).fill(false));
+  const [constraintChanged, setConstraintChanged] = useState(false);
+  const [savingConstraints, setSavingConstraints] = useState(false);
 
   const handleSaveAforo = async () => {
     if (draftAforo === '') {
@@ -46,8 +54,68 @@ const CuadrantePage: React.FC = () => {
     setLoadingCuadrante(true);
     try {
       const dateStr = toLocalISODate(selectedDate);
-      const data = await calculateCuadrante(dateStr);
-      setCuadranteData(data);
+      
+      // Cargar cuadrante, reservas y restricciones en paralelo
+      const [cuadranteData, bookingsData, constraintData] = await Promise.all([
+        calculateCuadrante(dateStr),
+        getBookingsByDate(dateStr),
+        getConstraintByDate(dateStr)
+      ]);
+      
+      setCuadranteData(cuadranteData);
+      
+      // Convertir reservas al formato de BookGrid
+      let convertedBookings = bookingsData.map(convertBookingToBookRow);
+      
+      // Cargar información de todos los clientes únicos
+      const uniqueClientIds = [...new Set(bookingsData.map(b => b.client_id))];
+      const clientPromises = uniqueClientIds.map(async (clientId) => {
+        try {
+          const client = await getClientById(clientId);
+          return { clientId, client };
+        } catch (error) {
+          console.error(`Error cargando cliente ${clientId}:`, error);
+          return { clientId, client: null };
+        }
+      });
+      
+      const clientResults = await Promise.all(clientPromises);
+      const clientMap = new Map(
+        clientResults
+          .filter(result => result.client !== null)
+          .map(result => [result.clientId, result.client])
+      );
+      
+      // Actualizar las reservas con la información de los clientes
+      convertedBookings = convertedBookings.map(booking => {
+        const client = clientMap.get(booking.clientId);
+        if (client) {
+          return {
+            ...booking,
+            clientName: `${client.name} ${client.surname}`.trim(),
+            clientInfo: {
+              name: client.name,
+              surname: client.surname,
+              phone_number: client.phone_number,
+              email: client.email,
+              created_at: client.created_at,
+            }
+          };
+        }
+        return booking;
+      });
+      
+      setBookings(convertedBookings);
+      
+      // Cargar restricciones
+      if (constraintData) {
+        const cells = constraintRangesToCells(constraintData.ranges);
+        setConstraintCells(cells);
+      } else {
+        setConstraintCells(Array(25).fill(false));
+      }
+      setConstraintChanged(false);
+      
     } catch (err) {
       console.error('Error cargando cuadrante', err);
       alert('Error al cargar el cuadrante');
@@ -149,6 +217,33 @@ const CuadrantePage: React.FC = () => {
     }
   };
 
+  // Guardar restricciones
+  const handleSaveConstraints = async () => {
+    if (!selectedDate) {
+      alert('Por favor selecciona una fecha');
+      return;
+    }
+    
+    setSavingConstraints(true);
+    try {
+      await saveConstraintForDate(selectedDate, constraintCells);
+      setConstraintChanged(false);
+      alert('Restricciones guardadas correctamente');
+    } catch (err) {
+      console.error('Error guardando restricciones', err);
+      alert('Error al guardar las restricciones');
+    } finally {
+      setSavingConstraints(false);
+    }
+  };
+
+  // Manejar cambios en las restricciones
+  const handleConstraintChange = (newCells: (string | number | React.ReactNode | boolean)[]) => {
+    const booleanCells = newCells.map(cell => Boolean(cell));
+    setConstraintCells(booleanCells);
+    setConstraintChanged(true);
+  };
+
   // Preparar datos para TimeGrid
   const prepareTimeGridData = () => {
     if (!cuadranteData) return [];
@@ -179,7 +274,37 @@ const CuadrantePage: React.FC = () => {
         label: 'Minutos Disponibles',
         values: cuadranteData.timeSlots.map(slot => slot.minutosDisponibles),
       },
+      {
+        key: 'restricciones',
+        label: 'Restricciones',
+        values: constraintCells,
+        editable: true,
+        checkboxRow: true,
+        onValuesChange: handleConstraintChange,
+      },
     ];
+  };
+
+  // Función para convertir Booking a BookRow
+  const convertBookingToBookRow = (booking: Booking): BookRow => {
+    const today = new Date();
+    const bookingDate = new Date(booking.booking_date);
+    const isPastDate = bookingDate < today;
+    
+    // Determinar si está pagado (amount_pending es 0 o null)
+    const isPaid = !booking.amount_pending || parseFloat(booking.amount_pending) === 0;
+    
+    return {
+      id: booking.id?.toString() || '',
+      clientId: booking.client_id,
+      clientName: `${booking.client_id}`, // Por ahora solo el ID, se actualizará con la información del cliente
+      entryTime: booking.hour || '00:00:00',
+      people: booking.people,
+      isPaid,
+      hasCheckout: booking.checked_out,
+      isPastDate,
+      createdAt: booking.created_at || new Date().toISOString(),
+    };
   };
 
   return (
@@ -210,7 +335,7 @@ const CuadrantePage: React.FC = () => {
             <h3>Ver cuadrante</h3>
             <DatePicker 
             value={selectedDate} 
-            onChange={setSelectedDate} 
+            onChange={(date) => setSelectedDate(date as Date | null)} 
             wrapperClassName="picker-dia"
             placeholderText="Selecciona fecha" />
             <div style={{ marginTop: '0.75rem' }}>
@@ -355,6 +480,30 @@ const CuadrantePage: React.FC = () => {
             stepMinutes={30}
             columnWidth={40}
           />
+          
+          {/* Botón para guardar restricciones */}
+          {constraintChanged && (
+            <div style={{ marginTop: '1rem' }}>
+              <ReactiveButton
+                style={{ backgroundColor: 'var(--color-secondary)' }}
+                idleText={savingConstraints ? "Guardando..." : "Guardar restricciones de reservas"}
+                onClick={handleSaveConstraints}
+                loading={savingConstraints}
+                disabled={savingConstraints}
+              />
+            </div>
+          )}
+          
+          {/* Tabla de reservas */}
+          {bookings.length > 0 && (
+            <div style={{ marginTop: '2rem' }}>
+              <h4>Reservas del día</h4>
+              <BookGrid 
+                books={bookings} 
+                columnWidth={20} 
+              />
+            </div>
+          )}
         </div>
       )}
 

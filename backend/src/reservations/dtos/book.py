@@ -5,6 +5,55 @@ from typing import Optional, List
 
 
 @dataclass
+class BookLogDTO:
+    """DTO para logs de reservas."""
+    id: Optional[int] = None
+    book_id: Optional[int] = None
+    datetime: Optional[datetime] = None
+    comment: str = ""
+
+    def validate_for_create(self):
+        if not self.book_id:
+            raise ValueError("Se requiere 'book_id' para crear un log")
+        if not self.comment:
+            raise ValueError("Se requiere 'comment' para crear un log")
+
+
+@dataclass
+class BookDetailDTO:
+    """DTO extendido para mostrar detalles completos de una reserva."""
+    # Campos básicos de BookDTO
+    id: Optional[int] = None
+    internal_order_id: Optional[str] = None
+    booking_date: Optional[date] = None
+    hour: Optional[time] = None
+    people: Optional[int] = 1
+    comment: Optional[str] = None
+    amount_paid: Optional[Decimal] = Decimal("0")
+    amount_pending: Optional[Decimal] = Decimal("0")
+    payment_date: Optional[datetime] = None
+    checked_in: Optional[bool] = None
+    checked_out: Optional[bool] = None
+    client_id: Optional[int] = None
+    product_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    
+    # Información del cliente
+    client_name: Optional[str] = None
+    client_surname: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_email: Optional[str] = None
+    client_created_at: Optional[datetime] = None
+    
+    # Información del creador
+    creator_type_name: Optional[str] = None
+    creator_name: Optional[str] = None
+    
+    # Información del producto (masajes)
+    product_baths: Optional[List] = None
+
+
+@dataclass
 class StaffBathRequestDTO:
     """Descripción mínima de un lote de baños (tipo + minutos + cantidad)."""
 

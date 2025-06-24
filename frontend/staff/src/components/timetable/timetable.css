@@ -35,6 +35,17 @@
   position: relative;
 }
 
+/* Estilos para celdas de checkbox */
+.tg-cell-checkbox {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tg-cell-checkbox input[type="checkbox"] {
+  margin: 0;
+  transform: scale(1.2);
+}
+
 
 
 

@@ -139,6 +139,26 @@ export async function createAvailabilityVersion(
   });
 }
 
+/**
+ * Crea una nueva versión de disponibilidad para un día de la semana.
+ */
+export async function createWeekdayAvailabilityVersion(
+  weekday: number,
+  ranges: AvailabilityRange[],
+  effectiveDate?: Date
+): Promise<Availability> {
+  const payload = {
+    weekday: weekday,
+    ranges: ranges,
+    effective_date: effectiveDate ? toLocalISODate(effectiveDate) : undefined,
+  };
+  
+  return http<Availability>(`${AVAIL_ENDPOINT}create-weekday-version/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // --------------------------------------------------------------------
 // Creación / actualización
 // --------------------------------------------------------------------
