@@ -97,13 +97,13 @@
 /* Layout grid principal del diálogo */
 .book-dialog-main-grid {
   display: grid;
-  grid-template-columns: 280px 280px 120px;
-  grid-template-rows: auto auto auto;
-  gap: 0.75rem;
+  grid-template-columns: 260px 260px;
+  grid-template-rows: auto auto;
+  gap: 0.5rem;
   grid-template-areas: 
-    "cliente creador registros"
-    "datos masajes masajes"
-    "pago pago pago";
+    "cliente creador"
+    "datos masajes"
+    "pago registros-pago";
 }
 
 .book-section-cliente {
@@ -131,6 +131,13 @@
 
 .book-section-pago {
   grid-area: pago;
+}
+
+.book-section-registros-pago {
+  grid-area: registros-pago;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .book-form-grid {
@@ -165,6 +172,36 @@
 
 .book-custom-comment {
   grid-area: comentarios;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Grid para sección de pago con dos columnas */
+.book-form-grid-pago {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: 
+    "pagado observaciones"
+    "pendiente observaciones" 
+    "fecha-pago observaciones";
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.book-form-field-pagado {
+  grid-area: pagado;
+}
+
+.book-form-field-pendiente {
+  grid-area: pendiente;
+}
+
+.book-form-field-fecha-pago {
+  grid-area: fecha-pago;
+}
+
+.book-custom-observation {
+  grid-area: observaciones;
   display: flex;
   flex-direction: column;
 }

@@ -29,6 +29,7 @@ class BookDetailDTO:
     hour: Optional[time] = None
     people: Optional[int] = 1
     comment: Optional[str] = None
+    observation: Optional[str] = None
     amount_paid: Optional[Decimal] = Decimal("0")
     amount_pending: Optional[Decimal] = Decimal("0")
     payment_date: Optional[datetime] = None

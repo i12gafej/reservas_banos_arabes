@@ -136,29 +136,28 @@ class BookViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"detail": f"Error al actualizar reserva: {str(e)}"}, status=400)
 
-    @action(detail=True, methods=["get"], url_path="logs")
-    def get_logs(self, request, pk=None):
-        """Obtiene todos los logs de una reserva."""
-        try:
-            book_id = int(pk)
-            log_dtos = BookManager.get_book_logs(book_id)
-            serializer = BookLogSerializer(log_dtos, many=True)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({"detail": f"Error al obtener logs: {str(e)}"}, status=400)
-
-    @action(detail=True, methods=["post"], url_path="logs")
-    def create_log(self, request, pk=None):
-        """Crea un nuevo log para una reserva."""
-        try:
-            book_id = int(pk)
-            data = request.data.copy()
-            data['book_id'] = book_id
-            
-            serializer = BookLogSerializer(data=data)
-            serializer.is_valid(raise_exception=True)
-            log_dto = serializer.save()
-            
-            return Response(BookLogSerializer(log_dto).data, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({"detail": f"Error al crear log: {str(e)}"}, status=400)
+    @action(detail=True, methods=["get", "post"], url_path="logs")
+    def manage_logs(self, request, pk=None):
+        """Obtiene todos los logs de una reserva (GET) o crea un nuevo log (POST)."""
+        if request.method == "GET":
+            try:
+                book_id = int(pk)
+                log_dtos = BookManager.get_book_logs(book_id)
+                serializer = BookLogSerializer(log_dtos, many=True)
+                return Response(serializer.data)
+            except Exception as e:
+                return Response({"detail": f"Error al obtener logs: {str(e)}"}, status=400)
+        
+        elif request.method == "POST":
+            try:
+                book_id = int(pk)
+                data = request.data.copy()
+                data['book_id'] = book_id
+                
+                serializer = BookLogSerializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                log_dto = serializer.save()
+                
+                return Response(BookLogSerializer(log_dto).data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"detail": f"Error al crear log: {str(e)}"}, status=400)

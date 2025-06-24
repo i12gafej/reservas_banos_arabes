@@ -187,6 +187,7 @@ class Book(models.Model):
     hour = models.TimeField(verbose_name="Hora de la reserva")
     people = models.IntegerField(default=1, verbose_name="Nº personas")
     comment = models.TextField(null=True, blank=True, verbose_name="Comentarios")
+    observation = models.TextField(null=True, blank=True, verbose_name="Observaciones")
     amount_paid = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Cantidad pagada")
     amount_pending = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Cantidad pendiente")
     payment_date = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de pago")

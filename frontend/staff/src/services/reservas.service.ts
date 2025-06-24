@@ -39,7 +39,7 @@ export interface BookDetail {
   hour: string;
   people: number;
   comment: string;
-
+  observation: string;
   // Datos de pago
   amount_paid: string;
   amount_pending: string;
@@ -79,6 +79,7 @@ export interface BookDetailUpdate {
   hour?: string;
   people?: number;
   comment?: string;
+  observation?: string;
   amount_paid?: string;
   amount_pending?: string;
   payment_date?: string | null;

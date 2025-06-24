@@ -38,6 +38,7 @@ interface BookEditForm {
   hour: string;
   people: number;
   comment: string;
+  observation: string;
   amount_paid: string;
   amount_pending: string;
   payment_date: Date | null;
@@ -150,6 +151,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
         hour: detail.hour || '',
         people: detail.people || 1,
         comment: detail.comment || '',
+        observation: detail.observation || '',
         amount_paid: detail.amount_paid || '',
         amount_pending: detail.amount_pending || '',
         payment_date: detail.payment_date ? new Date(detail.payment_date) : null,
@@ -236,6 +238,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
         hour: formValues.hour || undefined,
         people: formValues.people || undefined,
         comment: formValues.comment || undefined,
+        observation: formValues.observation || undefined,
         amount_paid: formValues.amount_paid || undefined,
         amount_pending: formValues.amount_pending || undefined,
         payment_date: formValues.payment_date ? formValues.payment_date.toISOString() : null,
@@ -355,6 +358,9 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
       <DefaultDialog
         open={showBookDetailDialog}
         onClose={() => setShowBookDetailDialog(false)}
+        onSave={handleConfirmSave}
+        saveLabel="Guardar"
+        cancelLabel="Cancelar"
         title="Editar Reserva"
       >
         {bookDetail && (
@@ -376,24 +382,14 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                 <p><strong>Creador:</strong> {bookDetail.creator_name}</p>
               </div>
 
-              {/* Botón de logs */}
-              <div className="book-dialog-section book-section-registros">
-                <ReactiveButton
-                  buttonState={loading ? 'loading' : 'idle'}
-                  onClick={handleLoadLogs}
-                  idleText="Ver Registros"
-                  loadingText="Cargando..."
-                  style={{ backgroundColor: '#007bff', fontSize: '0.7rem' }}
-                  className="book-dialog-button"
-                />
-              </div>
+              
 
               {/* Formulario de edición - Datos de reserva */}
               <div className="book-dialog-section book-section-datos">
                 <h3>Datos Reserva</h3>
                 <form onSubmit={handleSubmit(onSubmit)}>
                   <div className="book-form-grid-single">
-                    <div className="book-form-field book-form-field-date">
+                    <div className="book-form-field book-form-field-fecha">
                       <label>Fecha:</label>
                       <Controller
                         control={control}
@@ -410,7 +406,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                       />
                     </div>
                     
-                    <div className="book-form-field">
+                    <div className="book-form-field book-form-field-hora">
                       <label>Hora:</label>
                       <Controller
                         control={control}
@@ -434,7 +430,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                       />
                     </div>
                     
-                    <div className="book-form-field">
+                    <div className="book-form-field book-form-field-personas">
                       <label>Personas:</label>
                       <Controller
                         control={control}
@@ -485,8 +481,8 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
               <div className="book-dialog-section book-section-pago">
                 <h3>Información de Pago</h3>
                 <form onSubmit={handleSubmit(onSubmit)}>
-                  <div className="book-form-grid">
-                    <div className="book-form-field">
+                  <div className="book-form-grid-pago">
+                    <div className="book-form-field book-form-field-pagado">
                       <label>Pagado (€):</label>
                       <Controller
                         control={control}
@@ -497,7 +493,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                       />
                     </div>
                     
-                    <div className="book-form-field">
+                    <div className="book-form-field book-form-field-pendiente">
                       <label>Pendiente (€):</label>
                       <Controller
                         control={control}
@@ -508,7 +504,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                       />
                     </div>
                     
-                    <div className="book-form-field">
+                    <div className="book-form-field book-form-field-fecha-pago">
                       <label>Fecha pago:</label>
                       <div className="payment-date-container">
                         <Controller
@@ -527,7 +523,10 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                             />
                           )}
                         />
-                        <ReactiveButton
+                        
+                      </div>
+                      <div className="book-form-field book-form-field-hora">
+                      <ReactiveButton
                           buttonState="idle"
                           onClick={() => {
                             const now = new Date();
@@ -540,33 +539,39 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                           style={{ 
                             backgroundColor: '#17a2b8', 
                             fontSize: '0.65rem',
-                            padding: '0.2rem 0.4rem',
-                            minWidth: 'auto'
+                            padding: '0.2rem 0.5rem 0.4rem',
+                            marginTop: '0.3rem',
+                            width: '40%',
+                            minHeight: '10%'
                           }}
                         />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Botones de acción */}
-                  <div className="book-dialog-buttons">
-                    <ReactiveButton
-                      buttonState="idle"
-                      onClick={() => setShowBookDetailDialog(false)}
-                      idleText="Cancelar"
-                      style={{ backgroundColor: '#6c757d' }}
-                      className="book-dialog-button"
-                    />
-                    <ReactiveButton
-                      buttonState={loading ? 'loading' : 'idle'}
-                      type="submit"
-                      idleText="Guardar"
-                      loadingText="Guardando..."
-                      style={{ backgroundColor: '#28a745' }}
-                      className="book-dialog-button"
-                    />
+                    
+                    <div className="book-custom-observation">
+                      <label>Observaciones:</label>
+                      <Controller
+                        control={control}
+                        name="observation"
+                        render={({ field }) => (
+                          <textarea {...field} className="book-form-field book-form-field-comment" />
+                        )}
+                      />
+                    </div>
                   </div>
                 </form>
+              </div>
+
+              {/* Botón de logs junto a información de pago */}
+              <div className="book-dialog-section book-section-registros-pago">
+                <ReactiveButton
+                  buttonState={loading ? 'loading' : 'idle'}
+                  onClick={handleLoadLogs}
+                  idleText="Ver Registros"
+                  loadingText="Cargando..."
+                  style={{ backgroundColor: '#17a2b8', fontSize: '0.7rem' }}
+                  className="book-dialog-button"
+                />
               </div>
             </div>
           </div>
