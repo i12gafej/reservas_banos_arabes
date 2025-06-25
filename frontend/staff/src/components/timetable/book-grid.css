@@ -1,8 +1,11 @@
-.book-grid {
-  margin: 1rem 0;
+
+
+.book-grid-wrapper {
+  overflow-x: auto;
+  width: 100%;
 }
 
-.book-grid table {
+.book-grid {
   border-collapse: collapse;
   width: max-content;
   table-layout: fixed;
@@ -16,8 +19,13 @@
   text-align: center;
   min-width: var(--col-width, 20px);
   height: 20px;
-  font-size: 0.75rem;
   user-select: none;
+}
+
+.book-grid .client-col {
+  width: 70px;
+  background: #f5f5f5;
+  position: relative;
 }
 
 .book-grid .sortable-header {
@@ -30,35 +38,16 @@
   background-color: #e0e0e0;
 }
 
-
-
-.book-grid .client-col {
-  width: 150px;
-  background: #f5f5f5;
-  
-  padding: 1px 4px;
-}
-
-.book-grid .client-col td {
-  text-align: left;
-  color: #000000;
-}
-
-.book-grid .client-col th {
-  text-align: center;
-}
-
 .book-grid .time-col {
-  width: 80px;
   background: #fafafa;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-/* Estilos para las celdas con valores */
-.book-grid .time-cell[style*="background-color"] {
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  color: #000000;
-}
+
+
+
+
+
 
 /* Estilos para el contenido del diálogo */
 .book-dialog-content {

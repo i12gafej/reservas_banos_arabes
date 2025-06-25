@@ -500,7 +500,7 @@ const CuadrantePage: React.FC = () => {
               <h4>Reservas del día</h4>
               <BookGrid 
                 books={bookings} 
-                columnWidth={20} 
+                onBookingChanged={handleVerCuadrante}
               />
             </div>
           )}

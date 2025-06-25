@@ -3,8 +3,9 @@ import { useForm, Controller } from 'react-hook-form';
 import DatePicker from 'react-datepicker';
 import ReactiveButton from 'reactive-button';
 import { DefaultDialog } from '@/components/elements';
-import { getBookDetail, updateBookDetail, getBookLogs, createBookLog, updateBookMassages, BookDetail, BookLog, BookDetailUpdate, BookMassageUpdate } from '@/services/reservas.service';
+import { getBookDetail, updateBookDetail, getBookLogs, createBookLog, updateBookMassages, deleteBooking, BookDetail, BookLog, BookDetailUpdate, BookMassageUpdate } from '@/services/reservas.service';
 import './book-grid.css';
+import './timetable.css';
 
 export interface BookRow {
   id: string;
@@ -27,7 +28,7 @@ export interface BookRow {
 
 interface BookGridProps {
   books: BookRow[];
-  columnWidth?: number;
+  onBookingChanged?: () => void; // Callback para notificar cambios en reservas
 }
 
 type SortField = 'entryTime' | 'clientName';
@@ -62,7 +63,7 @@ const TIMES = Array.from({ length: 25 }, (_, i) => {
   return `${h}:${m}`;
 });
 
-const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
+const BookGrid: React.FC<BookGridProps> = ({ books, onBookingChanged }) => {
   const [sortField, setSortField] = useState<SortField>('entryTime');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selectedClient, setSelectedClient] = useState<BookRow | null>(null);
@@ -213,10 +214,13 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
       setOriginalAmountPending(originalPending);
       setCurrentAmountPaid(originalPaid);
       
+      // Formatear la hora para asegurar compatibilidad (HH:MM sin segundos)
+      const formattedHour = detail.hour ? detail.hour.substring(0, 5) : '';
+      
       // Resetear el formulario con los datos de la reserva
       reset({
         booking_date: detail.booking_date ? new Date(detail.booking_date) : null,
-        hour: detail.hour || '',
+        hour: formattedHour,
         people: detail.people || 1,
         comment: detail.comment || '',
         observation: detail.observation || '',
@@ -350,6 +354,11 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
       setCustomLogComment('');
       setShowBookDetailDialog(false);
       alert('Reserva actualizada correctamente');
+      
+      // Notificar al componente padre que hubo cambios
+      if (onBookingChanged) {
+        onBookingChanged();
+      }
     } catch (error) {
       console.error('=== DEBUG: Error en actualización ===');
       console.error('Error completo:', error);
@@ -360,12 +369,12 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
   };
 
   return (
-    <div className="book-grid">
-      <table style={{ '--col-width': `${columnWidth}px` } as React.CSSProperties}>
+    <div className="tg-wrapper">
+      <table className="tg-table">
         <thead>
           <tr>
             <th 
-              className="sortable-header client-col"
+              className="tg-label-col sortable-header"
               onClick={() => handleSortClick('clientName')}
             >
               Cliente
@@ -376,7 +385,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
               )}
             </th>
             <th 
-              className="sortable-header time-col"
+              className="tg-label-col sortable-header"
               onClick={() => handleSortClick('entryTime')}
             >
               Hora
@@ -387,7 +396,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
               )}
             </th>
             {TIMES.map((time) => (
-              <th key={time}>
+              <th key={time} className="tg-time-col">
                 {time}
               </th>
             ))}
@@ -401,13 +410,13 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
             return (
               <tr key={book.id}>
                 <td 
-                  className="client-col"
+                  className="tg-label-col"
                   onClick={() => handleClientClick(book)}
                   style={{ cursor: 'pointer' }}
                 >
                   {book.clientName}
                 </td>
-                <td className="time-col">
+                <td className="tg-label-col">
                   {book.entryTime.substring(0, 5)}
                 </td>
                 {cells.map((value, index) => (
@@ -513,18 +522,11 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                         name="hour"
                         render={({ field }) => (
                           <select {...field} className="book-form-field book-form-field-hour input">
-                            {Array.from({ length: 25 }, (_, i) => 10 * 60 + i * 30)
-                              .filter((m) => m <= 22 * 60)
-                              .map((m) => {
-                                const h = Math.floor(m / 60);
-                                const min = m % 60;
-                                const label = `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-                                return (
-                                  <option key={label} value={label}>
-                                    {label}
-                                  </option>
-                                );
-                              })}
+                            {TIMES.map((time) => (
+                              <option key={time} value={time}>
+                                {time}
+                              </option>
+                            ))}
                           </select>
                         )}
                       />
@@ -695,14 +697,48 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
               </div>
 
               {/* Botón de logs junto a información de pago */}
-              <div className="book-dialog-section book-section-registros-pago">
+              <div className="book-dialog-section book-section-registros-pago" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <ReactiveButton
                   buttonState={loading ? 'loading' : 'idle'}
                   onClick={handleLoadLogs}
                   idleText="Ver Registros"
                   loadingText="Cargando..."
-                  style={{ backgroundColor: '#17a2b8', fontSize: '0.7rem' }}
-                  className="book-dialog-button"
+                  style={{ fontSize: '0.7rem', width: '100%' }}
+                  className="book-dialog-button reactive-button primary"
+                />
+                <ReactiveButton
+                  buttonState={loading ? 'loading' : 'idle'}
+                  onClick={async () => {
+                    if (window.confirm('¿Estás seguro de que quieres eliminar esta reserva? Esta acción no se puede deshacer.')) {
+                      if (!bookDetail) return;
+                      try {
+                        setLoading(true);
+                        await deleteBooking(bookDetail.id);
+                        setShowBookDetailDialog(false);
+                        alert('Reserva eliminada correctamente');
+                        
+                        // Notificar al componente padre que hubo cambios
+                        if (onBookingChanged) {
+                          onBookingChanged();
+                        }
+                      } catch (error) {
+                        console.error('Error al eliminar la reserva:', error);
+                        alert('Error al eliminar la reserva: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+                      } finally {
+                        setLoading(false);
+                      }
+                    }
+                  }}
+                  idleText="ELIMINAR RESERVA"
+                  loadingText="Eliminando..."
+                  style={{ 
+                    fontSize: '0.7rem', 
+                    width: '100%',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    backgroundColor: '#dc3545'
+                  }}
+                  className="book-dialog-button reactive-button secondary"
                 />
               </div>
             </div>

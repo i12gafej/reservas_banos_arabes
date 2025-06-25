@@ -142,3 +142,10 @@ export async function updateBookMassages(bookId: number, data: BookMassageUpdate
     body: JSON.stringify(data),
   });
 }
+
+// Función para eliminar una reserva
+export async function deleteBooking(bookId: number): Promise<void> {
+  await http<void>(`${BOOKING_ENDPOINT}${bookId}/`, {
+    method: 'DELETE',
+  });
+}
