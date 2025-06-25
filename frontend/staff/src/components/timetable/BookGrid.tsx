@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import DatePicker from 'react-datepicker';
 import ReactiveButton from 'reactive-button';
 import { DefaultDialog } from '@/components/elements';
-import { getBookDetail, updateBookDetail, getBookLogs, createBookLog, BookDetail, BookLog, BookDetailUpdate } from '@/services/reservas.service';
+import { getBookDetail, updateBookDetail, getBookLogs, createBookLog, updateBookMassages, BookDetail, BookLog, BookDetailUpdate, BookMassageUpdate } from '@/services/reservas.service';
 import './book-grid.css';
 
 export interface BookRow {
@@ -79,8 +79,26 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
   const [customLogComment, setCustomLogComment] = useState('');
 
   // React Hook Form
-  const { control, handleSubmit, reset, watch, register, formState: { isDirty } } = useForm<BookEditForm>();
+  const { control, handleSubmit, reset, watch, register, formState: { isDirty }, setValue } = useForm<BookEditForm>();
   const formValues = watch();
+
+  // Estados para el cálculo de pagos
+  const [originalAmountPending, setOriginalAmountPending] = useState<number>(0);
+  const [currentAmountPaid, setCurrentAmountPaid] = useState<number>(0);
+
+  // Watcher para el campo amount_paid para recalcular amount_pending automáticamente
+  const watchedAmountPaid = watch('amount_paid');
+
+  // Efecto para recalcular amount_pending cuando cambia amount_paid
+  React.useEffect(() => {
+    if (watchedAmountPaid !== undefined && originalAmountPending !== undefined) {
+      const paidValue = parseFloat(watchedAmountPaid) || 0;
+      const newPending = originalAmountPending - (paidValue - currentAmountPaid);
+      
+      // Actualizar el campo amount_pending automáticamente
+      setValue('amount_pending', newPending.toFixed(2));
+    }
+  }, [watchedAmountPaid, originalAmountPending, currentAmountPaid, setValue]);
 
   // Función para convertir product_baths a valores del formulario
   const convertProductBathsToFormValues = (productBaths: BookDetail['product_baths']) => {
@@ -188,6 +206,13 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
       // Convertir masajes a valores del formulario
       const massageValues = convertProductBathsToFormValues(detail.product_baths || []);
       
+      // Inicializar valores originales para el cálculo de pagos
+      const originalPending = parseFloat(detail.amount_pending || '0');
+      const originalPaid = parseFloat(detail.amount_paid || '0');
+      
+      setOriginalAmountPending(originalPending);
+      setCurrentAmountPaid(originalPaid);
+      
       // Resetear el formulario con los datos de la reserva
       reset({
         booking_date: detail.booking_date ? new Date(detail.booking_date) : null,
@@ -227,23 +252,6 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
     }
   };
 
-  // Función para verificar si los masajes han cambiado
-  const checkMassageChanges = () => {
-    if (!bookDetail || !formValues) return false;
-    
-    const currentMassages = convertProductBathsToFormValues(bookDetail.product_baths || []);
-    
-    return (
-      formValues.massage60Relax !== currentMassages.massage60Relax ||
-      formValues.massage60Piedra !== currentMassages.massage60Piedra ||
-      formValues.massage60Exfol !== currentMassages.massage60Exfol ||
-      formValues.massage30Relax !== currentMassages.massage30Relax ||
-      formValues.massage30Piedra !== currentMassages.massage30Piedra ||
-      formValues.massage30Exfol !== currentMassages.massage30Exfol ||
-      formValues.massage15Relax !== currentMassages.massage15Relax
-    );
-  };
-
   // Función para generar vista previa de cambios
   const generateChangePreview = () => {
     if (!bookDetail || !formValues) return '';
@@ -274,19 +282,15 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
     if (formValues.product_id !== bookDetail.product_id) {
       changes.push('Producto/masajes modificados');
     }
-    if (checkMassageChanges()) {
-      changes.push('Los masajes han sido modificados');
-    }
     
     return changes.length > 0 ? changes.join('. ') : 'Sin cambios detectados';
   };
-
-
 
   // Función para enviar el formulario
   const onSubmit = async (data: BookEditForm) => {
     if (!bookDetail) return;
     
+    // Generar vista previa de cambios para campos no relacionados con masajes
     const preview = generateChangePreview();
     setChangePreview(preview);
     setShowConfirmDialog(true);
@@ -297,7 +301,21 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
     if (!bookDetail || !formValues) return;
     try {
       setLoading(true);
-      const updateData: BookDetailUpdate = {
+      
+      console.log('=== DEBUG: Iniciando actualización ===');
+      console.log('BookDetail ID:', bookDetail.id);
+      console.log('FormValues:', formValues);
+      
+      // Preparar datos completos incluyendo masajes
+      const updateData: BookDetailUpdate & {
+        massage60Relax?: number;
+        massage60Piedra?: number;
+        massage60Exfol?: number;
+        massage30Relax?: number;
+        massage30Piedra?: number;
+        massage30Exfol?: number;
+        massage15Relax?: number;
+      } = {
         booking_date: formValues.booking_date ? formValues.booking_date.toISOString().split('T')[0] : undefined,
         hour: formValues.hour || undefined,
         people: formValues.people || undefined,
@@ -308,16 +326,34 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
         payment_date: formValues.payment_date ? formValues.payment_date.toISOString() : null,
         product_id: formValues.product_id || undefined,
         log_comment: customLogComment || undefined,
+        // Agregar datos de masajes
+        massage60Relax: formValues.massage60Relax || 0,
+        massage60Piedra: formValues.massage60Piedra || 0,
+        massage60Exfol: formValues.massage60Exfol || 0,
+        massage30Relax: formValues.massage30Relax || 0,
+        massage30Piedra: formValues.massage30Piedra || 0,
+        massage30Exfol: formValues.massage30Exfol || 0,
+        massage15Relax: formValues.massage15Relax || 0,
       };
       
+      console.log('=== DEBUG: Datos a enviar ===');
+      console.log('UpdateData:', updateData);
+      console.log('URL:', `${import.meta.env.VITE_API_URL}/reservas/${bookDetail.id}/detail/`);
+      
       const updated = await updateBookDetail(bookDetail.id, updateData);
+      
+      console.log('=== DEBUG: Respuesta recibida ===');
+      console.log('Updated:', updated);
+      
       setBookDetail(updated);
       setShowConfirmDialog(false);
       setCustomLogComment('');
+      setShowBookDetailDialog(false);
       alert('Reserva actualizada correctamente');
     } catch (error) {
-      console.error('Error al actualizar reserva:', error);
-      alert('Error al actualizar la reserva');
+      console.error('=== DEBUG: Error en actualización ===');
+      console.error('Error completo:', error);
+      alert('Error al actualizar la reserva: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     } finally {
       setLoading(false);
     }
@@ -425,7 +461,7 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
         onSave={handleConfirmSave}
         saveLabel="Guardar"
         cancelLabel="Cancelar"
-        title="Editar Reserva"
+        title={`Editar Reserva - ${bookDetail?.internal_order_id}`} 
       >
         {bookDetail && (
           <div className="book-dialog-content">
@@ -590,7 +626,12 @@ const BookGrid: React.FC<BookGridProps> = ({ books, columnWidth = 20 }) => {
                         control={control}
                         name="amount_pending"
                         render={({ field }) => (
-                          <input {...field} type="number" step="0.01" />
+                          <div>
+                            <input {...field} type="number" step="0.01" readOnly style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
+                            <small style={{ color: '#666', fontSize: '0.75rem', display: 'block', marginTop: '2px' }}>
+                              Se calcula automáticamente
+                            </small>
+                          </div>
                         )}
                       />
                     </div>

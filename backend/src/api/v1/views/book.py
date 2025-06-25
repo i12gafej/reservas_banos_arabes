@@ -1,12 +1,15 @@
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
-from api.v1.serializers.book import BookingSerializer, BookLogSerializer, BookDetailSerializer
+from api.v1.serializers.book import BookingSerializer, BookLogSerializer, BookDetailSerializer, BookMassageUpdateSerializer
 from reservations.managers.book import BookManager
 from reservations.dtos.book import StaffBathRequestDTO, StaffBookingPayloadDTO
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class BookViewSet(viewsets.ViewSet):
     """CRUD endpoints para reservas (Book) usando DTO + manager."""
 
@@ -103,38 +106,82 @@ class BookViewSet(viewsets.ViewSet):
     # NOTA: Solo se usa ID numérico, se eliminó soporte para internal_order_id
     # ------------------------------------------------------------------
 
-    @action(detail=True, methods=["get"], url_path="detail")
-    def get_detail(self, request, pk=None):
-        """Obtiene los detalles completos de una reserva."""
-        try:
-            detail_dto = BookManager.get_book_detail(int(pk))
-            serializer = BookDetailSerializer(detail_dto)
-            return Response(serializer.data)
-        except ValueError as e:
-            return Response({"detail": str(e)}, status=404)
-        except Exception as e:
-            return Response({"detail": f"Error al obtener detalles: {str(e)}"}, status=400)
-
-    @action(detail=True, methods=["put"], url_path="detail")
-    def update_detail(self, request, pk=None):
-        """Actualiza una reserva con detalles completos y genera log automático."""
-        try:
-            # Obtener los detalles actuales
-            current_detail = BookManager.get_book_detail(int(pk))
-            
-            # Validar datos de entrada
-            serializer = BookDetailSerializer(current_detail, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            
-            # Actualizar con log automático
-            updated_detail = serializer.save()
-            
-            # Devolver detalles actualizados
-            return Response(BookDetailSerializer(updated_detail).data)
-        except ValueError as e:
-            return Response({"detail": str(e)}, status=404)
-        except Exception as e:
-            return Response({"detail": f"Error al actualizar reserva: {str(e)}"}, status=400)
+    @action(detail=True, methods=["get", "put", "options"], url_path="detail")
+    def manage_detail(self, request, pk=None):
+        """Obtiene los detalles completos de una reserva (GET) o actualiza una reserva (PUT)."""
+        # Agregar headers CORS y logging para debug
+        from django.http import JsonResponse
+        import json
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"manage_detail called with method: {request.method}, pk: {pk}")
+        logger.info(f"Request data: {request.data if hasattr(request, 'data') else 'No data'}")
+        
+        # Manejar CORS preflight requests
+        if request.method == "OPTIONS":
+            response = Response(status=200)
+            response["Access-Control-Allow-Origin"] = "*"
+            response["Access-Control-Allow-Methods"] = "GET, PUT, OPTIONS"
+            response["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+            response["Access-Control-Max-Age"] = "86400"
+            return response
+        
+        if request.method == "GET":
+            try:
+                detail_dto = BookManager.get_book_detail(int(pk))
+                serializer = BookDetailSerializer(detail_dto)
+                response = Response(serializer.data)
+                # Agregar headers CORS explícitos
+                response["Access-Control-Allow-Origin"] = "*"
+                response["Access-Control-Allow-Methods"] = "GET, PUT, OPTIONS"
+                response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                return response
+            except ValueError as e:
+                response = Response({"detail": str(e)}, status=404)
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
+            except Exception as e:
+                logger.error(f"Error en GET detail: {str(e)}")
+                response = Response({"detail": f"Error al obtener detalles: {str(e)}"}, status=400)
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
+        
+        elif request.method == "PUT":
+            try:
+                logger.info(f"Processing PUT request for book {pk}")
+                
+                # Obtener los detalles actuales
+                current_detail = BookManager.get_book_detail(int(pk))
+                
+                # Validar datos de entrada
+                logger.info(f"Validating data with serializer...")
+                serializer = BookDetailSerializer(current_detail, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                
+                # Actualizar con log automático
+                logger.info(f"Saving updated details...")
+                updated_detail = serializer.save()
+                
+                # Devolver detalles actualizados
+                response_data = BookDetailSerializer(updated_detail).data
+                response = Response(response_data)
+                # Agregar headers CORS explícitos
+                response["Access-Control-Allow-Origin"] = "*"
+                response["Access-Control-Allow-Methods"] = "GET, PUT, OPTIONS"
+                response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                logger.info(f"PUT request completed successfully")
+                return response
+            except ValueError as e:
+                logger.error(f"ValueError en PUT detail: {str(e)}")
+                response = Response({"detail": str(e)}, status=404)
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
+            except Exception as e:
+                logger.error(f"Error general en PUT detail: {str(e)}")
+                response = Response({"detail": f"Error al actualizar reserva: {str(e)}"}, status=400)
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
 
     @action(detail=True, methods=["get", "post"], url_path="logs")
     def manage_logs(self, request, pk=None):
@@ -161,3 +208,36 @@ class BookViewSet(viewsets.ViewSet):
                 return Response(BookLogSerializer(log_dto).data, status=status.HTTP_201_CREATED)
             except Exception as e:
                 return Response({"detail": f"Error al crear log: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=["put"], url_path="massages")
+    def update_massages(self, request, pk=None):
+        """Actualiza los masajes de una reserva existente."""
+        try:
+            # Obtener los detalles actuales para usar como instancia
+            current_detail = BookManager.get_book_detail(int(pk))
+            
+            # Validar datos de entrada
+            serializer = BookMassageUpdateSerializer(current_detail, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            
+            # Actualizar masajes
+            updated_detail = serializer.save()
+            
+            # Devolver detalles actualizados
+            return Response(BookDetailSerializer(updated_detail).data)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=404)
+        except Exception as e:
+            return Response({"detail": f"Error al actualizar masajes: {str(e)}"}, status=400)
+
+    @action(detail=True, methods=["get"], url_path="test")
+    def test_endpoint(self, request, pk=None):
+        """Endpoint de prueba para verificar que el routing funciona."""
+        response = Response({
+            "message": f"Test endpoint working for book {pk}",
+            "method": request.method,
+            "user": str(request.user),
+            "data": request.data if hasattr(request, 'data') else None
+        })
+        response["Access-Control-Allow-Origin"] = "*"
+        return response

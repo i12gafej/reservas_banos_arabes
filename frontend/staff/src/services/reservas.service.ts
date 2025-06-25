@@ -15,11 +15,6 @@ async function http<T>(url: string, options: RequestInit = {}): Promise<T> {
   return resp.json() as Promise<T>;
 }
 
-const BOOKING_ENDPOINT = `${BASE_URL}/reservas/`;
-
-export async function getReservas(): Promise<Booking[]> {
-  return http<Booking[]>(BOOKING_ENDPOINT);
-}
 
 // Interfaces para los nuevos endpoints
 export interface BookLog {
@@ -87,6 +82,32 @@ export interface BookDetailUpdate {
   checked_out?: boolean;
   product_id?: number;
   log_comment?: string; // Comentario personalizado para el log
+  // Campos de masajes opcionales
+  massage60Relax?: number;
+  massage60Piedra?: number;
+  massage60Exfol?: number;
+  massage30Relax?: number;
+  massage30Piedra?: number;
+  massage30Exfol?: number;
+  massage15Relax?: number;
+}
+
+export interface BookMassageUpdate {
+  massage60Relax: number;
+  massage60Piedra: number;
+  massage60Exfol: number;
+  massage30Relax: number;
+  massage30Piedra: number;
+  massage30Exfol: number;
+  massage15Relax: number;
+  people: number;
+}
+
+
+const BOOKING_ENDPOINT = `${BASE_URL}/reservas/`;
+
+export async function getReservas(): Promise<Booking[]> {
+  return http<Booking[]>(BOOKING_ENDPOINT);
 }
 
 // Funciones para obtener detalles de reserva
@@ -111,5 +132,13 @@ export async function createBookLog(bookId: number, comment: string): Promise<Bo
   return http<BookLog>(`${BOOKING_ENDPOINT}${bookId}/logs/`, {
     method: 'POST',
     body: JSON.stringify({ comment }),
+  });
+}
+
+// Funciones para actualizar masajes de una reserva
+export async function updateBookMassages(bookId: number, data: BookMassageUpdate): Promise<BookDetail> {
+  return http<BookDetail>(`${BOOKING_ENDPOINT}${bookId}/massages/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 }

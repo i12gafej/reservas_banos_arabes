@@ -13,7 +13,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from reservations.dtos.book import BookDTO, StaffBathRequestDTO, BookLogDTO, BookDetailDTO
+from reservations.dtos.book import BookDTO, StaffBathRequestDTO, BookLogDTO, BookDetailDTO, BookMassageUpdateDTO
 from reservations.models import Book, Product, BathType, ProductBaths, Client, BookLogs, Admin, Agent, GiftVoucher, WebBooking
 
 
@@ -104,7 +104,6 @@ class BookManager:
             "comment": dto.comment,
             "observation": dto.observation,
             "amount_paid": dto.amount_paid,
-            "observation": dto.observation,
             "amount_pending": dto.amount_pending,
             "payment_date": dto.payment_date,
             "checked_in": dto.checked_in,
@@ -361,7 +360,255 @@ class BookManager:
         
         return BookManager._build_book_detail_dto(book)
 
+    # ------------------------------------------------------------------
+    # Helper para asegurar BathTypes necesarios
+    # ------------------------------------------------------------------
 
+    @staticmethod
+    def ensure_bath_types_exist():
+        """Asegura que existen todos los BathTypes necesarios en la base de datos."""
+        # Definir todos los tipos de baño necesarios con sus precios por defecto
+        required_bath_types = [
+            # Baños sin masaje
+            {
+                'massage_type': 'none',
+                'massage_duration': '0',
+                'name': 'Baño sin masaje',
+                'price': Decimal('20.00')
+            },
+            # Masajes de 60 minutos
+            {
+                'massage_type': 'relax',
+                'massage_duration': '60',
+                'name': 'Masaje Relajante 60min',
+                'price': Decimal('30.00')
+            },
+            {
+                'massage_type': 'rock',
+                'massage_duration': '60',
+                'name': 'Masaje Piedras 60min',
+                'price': Decimal('35.00')
+            },
+            {
+                'massage_type': 'exfoliation',
+                'massage_duration': '60',
+                'name': 'Masaje Exfoliante 60min',
+                'price': Decimal('35.00')
+            },
+            # Masajes de 30 minutos
+            {
+                'massage_type': 'relax',
+                'massage_duration': '30',
+                'name': 'Masaje Relajante 30min',
+                'price': Decimal('20.00')
+            },
+            {
+                'massage_type': 'rock',
+                'massage_duration': '30',
+                'name': 'Masaje Piedras 30min',
+                'price': Decimal('25.00')
+            },
+            {
+                'massage_type': 'exfoliation',
+                'massage_duration': '30',
+                'name': 'Masaje Exfoliante 30min',
+                'price': Decimal('25.00')
+            },
+            # Masajes de 15 minutos
+            {
+                'massage_type': 'relax',
+                'massage_duration': '15',
+                'name': 'Masaje Relajante 15min',
+                'price': Decimal('15.00')
+            },
+        ]
+        
+        for bath_data in required_bath_types:
+            BathType.objects.get_or_create(
+                massage_type=bath_data['massage_type'],
+                massage_duration=bath_data['massage_duration'],
+                defaults={
+                    'name': bath_data['name'],
+                    'baths_duration': '02:00:00',
+                    'description': 'Autocreado por sistema',
+                    'price': bath_data['price'],
+                }
+            )
+
+    # ------------------------------------------------------------------
+    # Actualización de masajes en reserva existente
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    @transaction.atomic
+    def update_booking_massages(book_id: int, massages: BookMassageUpdateDTO) -> BookDetailDTO:
+        """Actualiza los masajes de una reserva existente encontrando o creando un producto adecuado."""
+        # Asegurar que existen todos los BathTypes necesarios
+        BookManager.ensure_bath_types_exist()
+        
+        try:
+            book = Book.objects.get(id=book_id)
+        except Book.DoesNotExist:
+            raise ValueError(f"Reserva con ID {book_id} no encontrada")
+            
+        # Convertir masajes a formato StaffBathRequestDTO (incluye baños sin masaje)
+        baths = massages.to_staff_bath_requests()
+        
+        # 1. Buscar los tipos de baños en la base de datos y calcular precio total
+        final_price = Decimal("0")
+        bath_type_details = []
+        
+        for br in baths:
+            try:
+                # Buscar el BathType existente en la base de datos
+                bath_type = BathType.objects.get(
+                    massage_type=br.massage_type,
+                    massage_duration=br.minutes
+                )
+                
+                # Calcular precio: bathtype.price x quantity
+                bath_total_price = bath_type.price * br.quantity
+                final_price += bath_total_price
+                
+                bath_type_details.append({
+                    'bath_type': bath_type,
+                    'quantity': br.quantity,
+                    'massage_type': br.massage_type,
+                    'duration': br.minutes
+                })
+                
+            except BathType.DoesNotExist:
+                raise ValueError(f"No existe el tipo de baño: {br.massage_type} de {br.minutes} minutos")
+        
+        # 2. Buscar producto existente con mismo precio y mismos BathTypes
+        bath_types_signature = sorted([
+            (detail['massage_type'], detail['duration'], detail['quantity']) 
+            for detail in bath_type_details
+        ])
+        
+        # Buscar productos con el mismo precio calculado
+        candidates = Product.objects.filter(price=final_price)
+        
+        for prod in candidates:
+            # Obtener los bath_types del producto candidato
+            prod_baths = list(prod.baths.values_list(
+                'bath_type__massage_type', 
+                'bath_type__massage_duration', 
+                'quantity'
+            ))
+            prod_baths_signature = sorted(prod_baths)
+            
+            # Si coinciden exactamente los tipos de baño y cantidades
+            if bath_types_signature == prod_baths_signature:
+                # ¡Producto encontrado! Calcular nueva cantidad pendiente
+                amount_already_paid = book.amount_paid
+                new_amount_pending = final_price - amount_already_paid
+                
+                book.product = prod
+                book.amount_pending = new_amount_pending
+                book.save(update_fields=['product_id', 'amount_pending'])
+                
+                # Crear log con información detallada del cambio de precio
+                if new_amount_pending < 0:
+                    log_message = f"Masajes actualizados. Producto existente: {prod.name} (€{final_price}). Hay €{abs(new_amount_pending)} a devolver al cliente."
+                elif new_amount_pending > 0:
+                    log_message = f"Masajes actualizados. Producto existente: {prod.name} (€{final_price}). Quedan €{new_amount_pending} pendientes de pago."
+                else:
+                    log_message = f"Masajes actualizados. Producto existente: {prod.name} (€{final_price}). Pago completado."
+                
+                log_dto = BookLogDTO(book_id=book_id, comment=log_message)
+                BookManager.create_book_log(log_dto)
+                
+                return BookManager._build_book_detail_dto(book)
+        
+        # 3. No existe producto, crear uno nuevo con visible=False
+        # Generar nombre descriptivo basado en los masajes
+        massage_descriptions = []
+        bath_descriptions = []
+        
+        # Mapeo de tipos de masaje a español
+        massage_type_spanish = {
+            'relax': 'Relajante',
+            'rock': 'Piedras', 
+            'exfoliation': 'Exfoliante',
+            'none': 'Solo Baños'
+        }
+        
+        for detail in bath_type_details:
+            massage_type = detail['massage_type']
+            duration = detail['duration']
+            quantity = detail['quantity']
+            
+            # Traducir tipo de masaje al español
+            spanish_type = massage_type_spanish.get(massage_type, massage_type.title())
+            
+            if massage_type == 'none':
+                # Para baños sin masaje
+                if quantity == 1:
+                    bath_descriptions.append(f"{quantity}x {spanish_type}")
+                else:
+                    bath_descriptions.append(f"{quantity}x {spanish_type}")
+            else:
+                # Para masajes con duración
+                massage_descriptions.append(f"{quantity}x {spanish_type} {duration}'")
+        
+        # Combinar descripciones de masajes y baños
+        all_descriptions = massage_descriptions + bath_descriptions
+        
+        if all_descriptions:
+            product_name = ", ".join(all_descriptions)
+        else:
+            # Fallback si no hay descripciones
+            product_name = f"Producto personalizado {book.book_date} {book.hour}"
+        
+        # Determinar si es solo baños sin masaje o incluye masajes
+        has_massages = any(detail['massage_type'] != 'none' for detail in bath_type_details)
+        
+        if has_massages:
+            product_description = "Producto personalizado con masajes"
+        else:
+            product_description = "Producto para baños sin masajes"
+        
+        product = Product.objects.create(
+            name=product_name,
+            description=product_description,
+            price=final_price,
+            uses_capacity=True,
+            uses_massagist=has_massages,
+            visible=False,
+        )
+        
+        # Crear los ProductBaths asociados
+        from reservations.models import ProductBaths
+        for detail in bath_type_details:
+            ProductBaths.objects.create(
+                product=product,
+                bath_type=detail['bath_type'],
+                quantity=detail['quantity']
+            )
+        
+        # 4. Actualizar la reserva con el nuevo producto
+        amount_already_paid = book.amount_paid
+        new_amount_pending = final_price - amount_already_paid
+        
+        book.product = product
+        book.amount_pending = new_amount_pending
+        book.save(update_fields=['product_id', 'amount_pending'])
+        
+        # 5. Crear log de la actualización con información detallada
+        massage_details = [f"{detail['quantity']}x {detail['bath_type'].name}" for detail in bath_type_details]
+        
+        if new_amount_pending < 0:
+            log_message = f"Masajes actualizados. Nuevo producto: {product.name} (€{final_price}). Incluye: {', '.join(massage_details)}. Hay €{abs(new_amount_pending)} a devolver al cliente."
+        elif new_amount_pending > 0:
+            log_message = f"Masajes actualizados. Nuevo producto: {product.name} (€{final_price}). Incluye: {', '.join(massage_details)}. Quedan €{new_amount_pending} pendientes de pago."
+        else:
+            log_message = f"Masajes actualizados. Nuevo producto: {product.name} (€{final_price}). Incluye: {', '.join(massage_details)}. Pago completado."
+        
+        log_dto = BookLogDTO(book_id=book_id, comment=log_message)
+        BookManager.create_book_log(log_dto)
+        
+        return BookManager._build_book_detail_dto(book)
 
     # ------------------------------------------------------------------
     # Generar mensaje de log automático para cambios
@@ -464,3 +711,89 @@ class BookManager:
             BookManager.create_book_log(log_dto)
 
         return updated_dto
+
+    # ------------------------------------------------------------------
+    # Comparación y actualización automática de masajes
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def compare_and_update_massages(book_id: int, new_massage_data: dict, people: int) -> tuple[bool, dict]:
+        """Compara los masajes actuales con los nuevos y actualiza si hay diferencias.
+        Retorna (updated: bool, new_values: dict) donde new_values contiene los valores actualizados."""
+        
+        try:
+            book = Book.objects.select_related('product').get(id=book_id)
+        except Book.DoesNotExist:
+            return False, {}
+        
+        # Obtener masajes actuales del producto
+        current_massages = {
+            'massage60Relax': 0,
+            'massage60Piedra': 0,
+            'massage60Exfol': 0,
+            'massage30Relax': 0,
+            'massage30Piedra': 0,
+            'massage30Exfol': 0,
+            'massage15Relax': 0,
+        }
+        
+        if book.product and book.product.baths.exists():
+            for product_bath in book.product.baths.select_related('bath_type').all():
+                bath_type = product_bath.bath_type
+                # Mapear de vuelta a los campos del formulario
+                if bath_type.massage_duration == '60':
+                    if bath_type.massage_type == 'relax':
+                        current_massages['massage60Relax'] = product_bath.quantity
+                    elif bath_type.massage_type == 'rock':
+                        current_massages['massage60Piedra'] = product_bath.quantity
+                    elif bath_type.massage_type == 'exfoliation':
+                        current_massages['massage60Exfol'] = product_bath.quantity
+                elif bath_type.massage_duration == '30':
+                    if bath_type.massage_type == 'relax':
+                        current_massages['massage30Relax'] = product_bath.quantity
+                    elif bath_type.massage_type == 'rock':
+                        current_massages['massage30Piedra'] = product_bath.quantity
+                    elif bath_type.massage_type == 'exfoliation':
+                        current_massages['massage30Exfol'] = product_bath.quantity
+                elif bath_type.massage_duration == '15':
+                    if bath_type.massage_type == 'relax':
+                        current_massages['massage15Relax'] = product_bath.quantity
+        
+        # Comparar con los nuevos datos de masajes
+        massage_fields = ['massage60Relax', 'massage60Piedra', 'massage60Exfol', 
+                         'massage30Relax', 'massage30Piedra', 'massage30Exfol', 'massage15Relax']
+        
+        has_changes = False
+        for field in massage_fields:
+            new_value = new_massage_data.get(field, 0)
+            current_value = current_massages[field]
+            if new_value != current_value:
+                has_changes = True
+                break
+        
+        # Si hay cambios, actualizar masajes
+        if has_changes:
+            massage_dto = BookMassageUpdateDTO(
+                massage60Relax=new_massage_data.get('massage60Relax', 0),
+                massage60Piedra=new_massage_data.get('massage60Piedra', 0),
+                massage60Exfol=new_massage_data.get('massage60Exfol', 0),
+                massage30Relax=new_massage_data.get('massage30Relax', 0),
+                massage30Piedra=new_massage_data.get('massage30Piedra', 0),
+                massage30Exfol=new_massage_data.get('massage30Exfol', 0),
+                massage15Relax=new_massage_data.get('massage15Relax', 0),
+                people=people
+            )
+            
+            # Actualizar masajes
+            updated_detail = BookManager.update_booking_massages(book_id, massage_dto)
+            
+            # Refrescar el book desde la BD para obtener los valores actualizados
+            book.refresh_from_db()
+            
+            # Devolver los valores que realmente se guardaron en la BD
+            return True, {
+                'product_id': book.product_id,
+                'amount_pending': book.amount_pending
+            }
+        
+        return False, {}

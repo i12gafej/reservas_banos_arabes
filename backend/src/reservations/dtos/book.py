@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, date, time
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 
 @dataclass
@@ -108,6 +108,7 @@ class BookDTO:
     hour: Optional[time] = None
     people: Optional[int] = 1
     comment: Optional[str] = None
+    observation: Optional[str] = None
 
     amount_paid: Optional[Decimal] = Decimal("0")
     amount_pending: Optional[Decimal] = Decimal("0")
@@ -135,3 +136,54 @@ class BookDTO:
             raise ValueError("Se requiere 'id' para actualizar la reserva")
         if self.product_id is None:
             raise ValueError("Debe indicar 'product_id'")
+
+
+@dataclass
+class BookMassageUpdateDTO:
+    """DTO para actualizar masajes de una reserva existente."""
+    massage60Relax: int = 0
+    massage60Piedra: int = 0
+    massage60Exfol: int = 0
+    massage30Relax: int = 0
+    massage30Piedra: int = 0
+    massage30Exfol: int = 0
+    massage15Relax: int = 0
+    people: int = 1  # Número de personas para calcular baños sin masaje
+
+    def to_staff_bath_requests(self) -> List[StaffBathRequestDTO]:
+        """Convierte los valores de masajes a una lista de StaffBathRequestDTO incluyendo baños sin masaje."""
+        baths = []
+        
+        # Mapeo de campos a tipos de masaje
+        massage_map = {
+            'massage60Relax': ('relax', '60'),
+            'massage60Piedra': ('rock', '60'), 
+            'massage60Exfol': ('exfoliation', '60'),
+            'massage30Relax': ('relax', '30'),
+            'massage30Piedra': ('rock', '30'),
+            'massage30Exfol': ('exfoliation', '30'),
+            'massage15Relax': ('relax', '15'),
+        }
+        
+        # Contar total de masajes
+        total_massages = 0
+        for field_name, (massage_type, duration) in massage_map.items():
+            quantity = getattr(self, field_name, 0)
+            if quantity > 0:
+                baths.append(StaffBathRequestDTO(
+                    massage_type=massage_type,
+                    minutes=duration,
+                    quantity=quantity
+                ))
+                total_massages += quantity
+        
+        # Agregar baños sin masaje para las personas restantes
+        people_without_massage = self.people - total_massages
+        if people_without_massage > 0:
+            baths.append(StaffBathRequestDTO(
+                massage_type='none',
+                minutes='0',
+                quantity=people_without_massage
+            ))
+        
+        return baths
