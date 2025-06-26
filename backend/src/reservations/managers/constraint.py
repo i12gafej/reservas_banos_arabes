@@ -195,3 +195,4 @@ class ConstraintManager:
                 cells[i] = True
         
         return cells
+

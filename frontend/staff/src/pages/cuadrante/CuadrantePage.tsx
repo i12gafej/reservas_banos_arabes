@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactiveButton from 'reactive-button';
 import { DefaultDialog, DatePicker } from '@/components/elements';
+import { GeneralSearch } from '@/components/common';
 import { useForm, Controller } from 'react-hook-form';
 import PhoneInput from 'react-phone-input-2';
 import esLocale from 'react-phone-input-2/lang/es.json';
@@ -28,6 +29,9 @@ const CuadrantePage: React.FC = () => {
   const [constraintCells, setConstraintCells] = useState<boolean[]>(Array(25).fill(false));
   const [constraintChanged, setConstraintChanged] = useState(false);
   const [savingConstraints, setSavingConstraints] = useState(false);
+
+  // Cheque regalo
+  const [selectedGiftVoucher, setSelectedGiftVoucher] = useState<number | null>(null);
 
   const handleSaveAforo = async () => {
     if (draftAforo === '') {
@@ -164,6 +168,7 @@ const CuadrantePage: React.FC = () => {
     handleSubmit,
     control,
     reset,
+    setValue,
   } = useForm<FormInputs>({
     defaultValues: {
       hour: '10:00',
@@ -235,6 +240,48 @@ const CuadrantePage: React.FC = () => {
     } finally {
       setSavingConstraints(false);
     }
+  };
+
+  // Manejar selección de cliente desde el buscador general
+  const handleClientSelect = (clientData: {
+    name: string;
+    surname: string;
+    phone_number: string;
+    email: string;
+  }) => {
+    // Autocompletar campos del formulario
+    setValue('name', clientData.name);
+    setValue('surname', clientData.surname);
+    setValue('phone', clientData.phone_number);
+    setValue('email', clientData.email);
+    // Limpiar cheque regalo si se selecciona un cliente normal
+    setSelectedGiftVoucher(null);
+  };
+
+  // Manejar selección de cheque regalo
+  const handleGiftVoucherSelect = (giftVoucherId: number, clientData: {
+    name: string;
+    surname: string;
+    phone_number: string;
+    email: string;
+  }) => {
+    // Autocompletar campos del formulario con datos del cliente
+    setValue('name', clientData.name);
+    setValue('surname', clientData.surname);
+    setValue('phone', clientData.phone_number);
+    setValue('email', clientData.email);
+    
+    // Limpiar campos de masaje
+    setValue('massage60Relax', 0);
+    setValue('massage60Piedra', 0);
+    setValue('massage60Exfol', 0);
+    setValue('massage30Relax', 0);
+    setValue('massage30Piedra', 0);
+    setValue('massage30Exfol', 0);
+    setValue('massage15Relax', 0);
+    
+    // Establecer cheque regalo seleccionado
+    setSelectedGiftVoucher(giftVoucherId);
   };
 
   // Manejar cambios en las restricciones
@@ -354,6 +401,20 @@ const CuadrantePage: React.FC = () => {
         <main>
             <div className="card">
               <h3>Reservar Baños</h3>
+              
+              {/* Buscador General */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                
+                <GeneralSearch 
+                  onClientSelect={handleClientSelect}
+                  onGiftVoucherSelect={handleGiftVoucherSelect}
+                  placeholder="Buscar por nombre, teléfono, email, ID de reserva, cheque regalo..."
+                />
+                <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
+                  Busca clientes, reservas o cheques regalo para autocompletar los datos del formulario
+                </p>
+              </div>
+              
               <form onSubmit={handleSubmit(onSubmit)}>
                 {/* 4-column grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', width: '100%'}}>
@@ -411,6 +472,34 @@ const CuadrantePage: React.FC = () => {
                   {/* Col 3: masaje grid */}
                   <div>
                     <h4>Reserva Masaje</h4>
+                    {selectedGiftVoucher && (
+                      <div style={{ 
+                        marginBottom: '1rem', 
+                        padding: '0.75rem', 
+                        backgroundColor: '#f0f9ff', 
+                        border: '1px solid #0ea5e9', 
+                        borderRadius: '6px',
+                        color: '#0369a1'
+                      }}>
+                        🎁 Usando cheque regalo con ID #{selectedGiftVoucher}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGiftVoucher(null)}
+                          style={{
+                            marginLeft: '0.5rem',
+                            padding: '0.25rem 0.5rem',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ✕ Limpiar
+                        </button>
+                      </div>
+                    )}
                     <table style={{ width: '100%', textAlign: 'center' }}>
                       <thead>
                         <tr>
@@ -431,7 +520,13 @@ const CuadrantePage: React.FC = () => {
                               }
                               return (
                                 <td key={tipo}>
-                                  <input type="number" min={0} {...register(nameKey as any)} style={{ width: '50%' }} />
+                                  <input 
+                                    type="number" 
+                                    min={0} 
+                                    {...register(nameKey as any)} 
+                                    style={{ width: '50%' }} 
+                                    disabled={selectedGiftVoucher !== null}
+                                  />
                                 </td>
                               );
                             })}

@@ -22,3 +22,4 @@ class ConstraintDTO:
     
     def __str__(self):
         return f"Restricción {self.day.strftime('%d/%m/%Y')} ({len(self.ranges)} rangos)"
+

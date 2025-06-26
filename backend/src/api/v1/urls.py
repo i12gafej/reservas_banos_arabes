@@ -11,6 +11,7 @@ from api.v1.views.gift_voucher import GiftVoucherViewSet
 from api.v1.views.capacity import CapacityViewSet
 from api.v1.views.bath_type import BathTypeViewSet
 from api.v1.views.constraint import ConstraintViewSet
+from api.v1.views.general_search import GeneralSearchView
 
 router = DefaultRouter()
 router.register(r'clientes', ClientViewSet, basename='client')
@@ -26,4 +27,5 @@ router.register(r'restricciones', ConstraintViewSet, basename='constraint')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('busqueda-general/', GeneralSearchView.as_view(), name='general-search'),
 ] 
