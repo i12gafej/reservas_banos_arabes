@@ -16,7 +16,11 @@ interface GeneralSearchProps {
     surname: string;
     phone_number: string;
     email: string;
-  }) => void;
+  }, productBaths?: Array<{
+    massage_type: 'relax' | 'rock' | 'exfoliation' | 'none';
+    massage_duration: '15' | '30' | '60' | '0';
+    quantity: number;
+  }>, people?: number, productId?: number) => void;
   placeholder?: string;
 }
 

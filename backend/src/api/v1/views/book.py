@@ -3,10 +3,12 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.contrib.contenttypes.models import ContentType
 
 from api.v1.serializers.book import BookingSerializer, BookLogSerializer, BookDetailSerializer, BookMassageUpdateSerializer
 from reservations.managers.book import BookManager
 from reservations.dtos.book import StaffBathRequestDTO, StaffBookingPayloadDTO
+from reservations.models import GiftVoucher
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -70,34 +72,51 @@ class BookViewSet(viewsets.ViewSet):
                 product_id=data.get("product_id"),
                 baths=[StaffBathRequestDTO(**b) for b in data.get("baths", [])] if data.get("baths") else None,
                 price=data.get("price"),
-                name=data["name"],
+                client_id=data.get("client_id"),  # Nuevo campo
+                name=data.get("name", ""),
                 surname=data.get("surname", ""),
-                phone=data["phone_number"],
+                phone_number=data.get("phone_number", ""),
                 email=data.get("email", ""),
                 date=data["date"],
                 hour=data["hour"],
                 people=data["people"],
-                comment=data.get("comment", "")
+                comment=data.get("comment", ""),
+                force=data.get("force", False),  # Nuevo campo
+                creator_type_id=data.get("creator_type_id"),
+                creator_id=data.get("creator_id")
             )
             payload.validate()
             dto_created = BookManager.create_booking_from_staff(
                 product_id=payload.product_id,
                 baths=payload.baths,
                 price=payload.price,
+                client_id=payload.client_id,  # Nuevo campo
                 name=payload.name,
                 surname=payload.surname,
-                phone=payload.phone,
+                phone=payload.phone_number,
                 email=payload.email,
                 date=payload.date,
                 hour=payload.hour,
                 people=payload.people,
                 comment=payload.comment or "",
+                force=payload.force,  # Nuevo campo
+                creator_type_id=payload.creator_type_id,
+                creator_id=payload.creator_id,
             )
             return Response(BookingSerializer(dto_created).data, status=status.HTTP_201_CREATED)
         except KeyError as e:
             return Response({"detail": f"Campo requerido faltante: {e.args[0]}"}, status=400)
         except Exception as e:
             return Response({"detail": f"Error al crear reserva staff: {str(e)}"}, status=400)
+
+    @action(detail=False, methods=["get"], url_path="gift-voucher-content-type")
+    def gift_voucher_content_type(self, request):
+        """Obtiene el ContentType ID para GiftVoucher."""
+        try:
+            content_type = ContentType.objects.get_for_model(GiftVoucher)
+            return Response({"content_type_id": content_type.id})
+        except Exception as e:
+            return Response({"detail": f"Error obteniendo ContentType: {str(e)}"}, status=400)
 
 
 
@@ -230,14 +249,3 @@ class BookViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({"detail": f"Error al actualizar masajes: {str(e)}"}, status=400)
 
-    @action(detail=True, methods=["get"], url_path="test")
-    def test_endpoint(self, request, pk=None):
-        """Endpoint de prueba para verificar que el routing funciona."""
-        response = Response({
-            "message": f"Test endpoint working for book {pk}",
-            "method": request.method,
-            "user": str(request.user),
-            "data": request.data if hasattr(request, 'data') else None
-        })
-        response["Access-Control-Allow-Origin"] = "*"
-        return response

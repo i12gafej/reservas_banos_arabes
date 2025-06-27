@@ -13,6 +13,7 @@ interface DefaultDialogProps {
   onSave?: () => void;
   saveLabel?: string;
   cancelLabel?: string;
+  width?: string;
 }
 
 const DefaultDialog: React.FC<DefaultDialogProps> = ({
@@ -23,6 +24,7 @@ const DefaultDialog: React.FC<DefaultDialogProps> = ({
   onSave,
   saveLabel = 'Guardar',
   cancelLabel = 'Cancelar',
+  width = '600px',
 }) => {
   // Evitar scroll del fondo mientras el modal está abierto
   useEffect(() => {
@@ -40,7 +42,7 @@ const DefaultDialog: React.FC<DefaultDialogProps> = ({
 
   return ReactDOM.createPortal(
     <div className="dialog-overlay" role="dialog" aria-modal="true">
-      <div className="dialog-box">
+      <div className="dialog-box" style={{ width: width }}>
         {/* Cabecera */}
         <div className="dialog-header">
           {title && <h2 className="dialog-title">{title}</h2>}

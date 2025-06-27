@@ -144,14 +144,15 @@ class GeneralSearchService:
             query |= Q(id=int(term))
             query |= Q(buyer_client__id=int(term))
         
-        gift_vouchers = GiftVoucher.objects.select_related('buyer_client', 'product').filter(query).order_by('-created_at')[:10]
+        gift_vouchers = GiftVoucher.objects.select_related('buyer_client', 'product').prefetch_related('product__baths__bath_type').filter(query & Q(status='paid')).order_by('-created_at')[:10]
         
         return [
             {
                 'id': voucher.id,
                 'code': voucher.code,
                 'price': str(voucher.price),
-                'used': voucher.used,
+                'used': voucher.status == 'used',  # Convertir status a boolean para compatibilidad
+                'status': voucher.status,
                 'bought_date': voucher.bought_date.isoformat() if voucher.bought_date else None,
                 'recipient': {
                     'name': voucher.recipients_name or '',
@@ -165,8 +166,18 @@ class GeneralSearchService:
                     'phone_number': voucher.buyer_client.phone_number or '',
                     'email': voucher.buyer_client.email or '',
                 },
+                'product_id': voucher.product.id if voucher.product else None,
                 'product_name': voucher.product.name if voucher.product else '',
                 'gift_name': voucher.gift_name or '',
+                'people': voucher.people,
+                'product_baths': [
+                    {
+                        'massage_type': pb.bath_type.massage_type,
+                        'massage_duration': pb.bath_type.massage_duration,
+                        'quantity': pb.quantity
+                    }
+                    for pb in voucher.product.baths.all()
+                ] if voucher.product else [],
                 'type': 'gift_voucher',
                 'display_text': f"Cheque #{voucher.code} - {voucher.gift_name or 'Sin nombre'}",
                 'secondary_text': f"Comprador: {voucher.buyer_client.name} {voucher.buyer_client.surname or ''}".strip() + (f" | Destinatario: {voucher.recipients_name or ''} {voucher.recipients_surname or ''}".strip() if voucher.recipients_name else "")

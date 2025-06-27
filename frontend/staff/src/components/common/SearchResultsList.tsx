@@ -16,7 +16,11 @@ interface SearchResultsListProps {
     surname: string;
     phone_number: string;
     email: string;
-  }) => void;
+  }, productBaths?: Array<{
+    massage_type: 'relax' | 'rock' | 'exfoliation' | 'none';
+    massage_duration: '15' | '30' | '60' | '0';
+    quantity: number;
+  }>, people?: number, productId?: number) => void;
   onClose: () => void;
 }
 
@@ -45,9 +49,13 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
     surname: string;
     phone_number: string;
     email: string;
-  }) => {
+  }, productBaths?: Array<{
+    massage_type: 'relax' | 'rock' | 'exfoliation' | 'none';
+    massage_duration: '15' | '30' | '60' | '0';
+    quantity: number;
+  }>, people?: number, productId?: number) => {
     if (onGiftVoucherSelect) {
-      onGiftVoucherSelect(giftVoucherId, clientData);
+      onGiftVoucherSelect(giftVoucherId, clientData, productBaths, people, productId);
       onClose();
     }
   };
@@ -150,7 +158,7 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
             surname: result.buyer_client.surname,
             phone_number: result.buyer_client.phone_number,
             email: result.buyer_client.email
-          })}
+          }, result.product_baths, result.people, result.product_id)}
           size="small"
         />
         {result.recipient.name && (
@@ -162,7 +170,7 @@ const SearchResultsList: React.FC<SearchResultsListProps> = ({
               surname: result.recipient.surname,
               phone_number: '',
               email: result.recipient.email
-            })}
+            }, result.product_baths, result.people, result.product_id)}
             size="small"
           />
         )}

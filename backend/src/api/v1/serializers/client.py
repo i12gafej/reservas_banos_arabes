@@ -13,6 +13,7 @@ class ClientSerializer(serializers.Serializer):
     phone_number = serializers.CharField(allow_blank=True, required=False)
     email = serializers.EmailField(allow_null=True, required=False)
     created_at = serializers.DateTimeField(read_only=True)
+    match_info = serializers.DictField(read_only=True, required=False)
 
     # ------------------------------------------------------------------
     # Creación

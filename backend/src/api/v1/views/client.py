@@ -38,4 +38,134 @@ class ClientViewSet(viewsets.ViewSet):
 
     def destroy(self, request, pk=None):
         ClientManager.delete_client(int(pk))
-        return Response(status=status.HTTP_204_NO_CONTENT) 
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ------------------------------------------------------------------
+    # Endpoints para unificación de clientes
+    # ------------------------------------------------------------------
+
+    @action(detail=False, methods=["get"], url_path="duplicados-preview")
+    def preview_duplicates(self, request):
+        """
+        Obtiene una vista previa de los clientes duplicados sin realizar cambios.
+        
+        GET /api/v1/clientes/duplicados-preview/
+        """
+        try:
+            preview_data = ClientManager.get_duplicate_clients_preview()
+            return Response(preview_data)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error obteniendo vista previa de duplicados: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=["post"], url_path="unificar")
+    def unify_clients(self, request):
+        """
+        Unifica todos los clientes duplicados encontrados en el sistema.
+        
+        POST /api/v1/clientes/unificar/
+        """
+        try:
+            result = ClientManager.unify_duplicate_clients()
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error durante la unificación de clientes: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=["get"], url_path="buscar-similares")
+    def find_similar_clients(self, request):
+        """
+        Busca clientes similares basándose en criterios de búsqueda.
+        
+        GET /api/v1/clientes/buscar-similares/?name=X&surname=Y&email=Z&phone_number=W
+        """
+        try:
+            name = request.query_params.get('name')
+            surname = request.query_params.get('surname') 
+            email = request.query_params.get('email')
+            phone_number = request.query_params.get('phone_number')
+            
+            dtos = ClientManager.find_similar_clients(
+                name=name,
+                surname=surname,
+                email=email,
+                phone_number=phone_number
+            )
+            
+            serializer = ClientSerializer(dtos, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            return Response(
+                {"detail": f"Error buscando clientes similares: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            ) 
+
+    # ------------------------------------------------------------------
+    # Endpoints para unificación de clientes
+    # ------------------------------------------------------------------
+
+    @action(detail=False, methods=["get"], url_path="duplicados-preview")
+    def preview_duplicates(self, request):
+        """
+        Obtiene una vista previa de los clientes duplicados sin realizar cambios.
+        
+        GET /api/v1/clientes/duplicados-preview/
+        """
+        try:
+            preview_data = ClientManager.get_duplicate_clients_preview()
+            return Response(preview_data)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error obteniendo vista previa de duplicados: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=["post"], url_path="unificar")
+    def unify_clients(self, request):
+        """
+        Unifica todos los clientes duplicados encontrados en el sistema.
+        
+        POST /api/v1/clientes/unificar/
+        """
+        try:
+            result = ClientManager.unify_duplicate_clients()
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"detail": f"Error durante la unificación de clientes: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=["get"], url_path="buscar-similares")
+    def find_similar_clients(self, request):
+        """
+        Busca clientes similares basándose en criterios de búsqueda.
+        
+        GET /api/v1/clientes/buscar-similares/?name=X&surname=Y&email=Z&phone_number=W
+        """
+        try:
+            name = request.query_params.get('name')
+            surname = request.query_params.get('surname') 
+            email = request.query_params.get('email')
+            phone_number = request.query_params.get('phone_number')
+            
+            dtos = ClientManager.find_similar_clients(
+                name=name,
+                surname=surname,
+                email=email,
+                phone_number=phone_number
+            )
+            
+            serializer = ClientSerializer(dtos, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            return Response(
+                {"detail": f"Error buscando clientes similares: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            ) 

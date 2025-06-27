@@ -43,6 +43,7 @@ export interface GiftVoucherResult extends SearchResult {
   code: string;
   price: string;
   used: boolean;
+  status: 'pending_payment' | 'paid' | 'used';
   bought_date: string | null;
   recipient: {
     name: string;
@@ -56,8 +57,15 @@ export interface GiftVoucherResult extends SearchResult {
     phone_number: string;
     email: string;
   };
+  product_id: number;
   product_name: string;
   gift_name: string;
+  people: number;
+  product_baths: Array<{
+    massage_type: 'relax' | 'rock' | 'exfoliation' | 'none';
+    massage_duration: '15' | '30' | '60' | '0';
+    quantity: number;
+  }>;
 }
 
 export interface GeneralSearchResponse {
@@ -99,3 +107,4 @@ export const generalSearchService = {
     return response.data;
   }
 }; 
+

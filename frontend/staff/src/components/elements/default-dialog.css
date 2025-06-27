@@ -11,11 +11,20 @@
 .dialog-box {
   background: #fff;
   border-radius: 8px;
-  max-width: 600px;
-  width: 90%;
+  max-width: none; /* Permitir que el width inline tenga prioridad */
+  width: auto; /* Por defecto, usar el width inline */
   max-height: 90vh;
   display: flex;
   flex-direction: column;
+  min-width: 300px; /* Ancho mínimo para evitar que se haga muy pequeño */
+}
+
+/* Para pantallas pequeñas, limitar el ancho para que no se salga */
+@media (max-width: 768px) {
+  .dialog-box {
+    width: 95% !important;
+    max-width: 95% !important;
+  }
 }
 
 .dialog-header {

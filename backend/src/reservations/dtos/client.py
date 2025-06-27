@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 
 # ---------------------------------------------------------------------------
@@ -22,6 +22,9 @@ class ClientDTO:
 
     # Sólo lectura (se rellena al devolver datos)
     created_at: Optional[datetime] = None
+    
+    # Información de coincidencias para búsquedas (opcional)
+    match_info: Optional[Dict[str, bool]] = None
 
     # Métodos de validación contextuales --------------------------------------------------
     def validate_for_create(self):

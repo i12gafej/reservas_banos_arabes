@@ -1,0 +1,118 @@
+.massage-grid-container {
+  margin-top: 1.5rem;
+}
+
+.massage-grid-container h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.no-massages-message {
+  color: #666;
+  font-style: italic;
+  margin: 1rem 0;
+  text-align: center;
+  padding: 2rem;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.massage-books-table-wrapper {
+  overflow-x: auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0e0e0;
+}
+
+.massage-books-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.massage-books-table th {
+  background-color: #f8f9fa;
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #dee2e6;
+  white-space: nowrap;
+}
+
+.massage-books-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #dee2e6;
+  vertical-align: top;
+}
+
+.massage-books-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.massage-books-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Estilos específicos para cada columna */
+.client-name {
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 150px;
+}
+
+.arrival-time {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #27ae60;
+  min-width: 80px;
+}
+
+.client-phone {
+  font-family: 'Courier New', monospace;
+  color: #666;
+  min-width: 120px;
+}
+
+.massages {
+  color: #8e44ad;
+  font-weight: 500;
+  min-width: 200px;
+  max-width: 300px;
+  word-wrap: break-word;
+}
+
+.comments {
+  color: #666;
+  max-width: 200px;
+  word-wrap: break-word;
+  font-style: italic;
+}
+
+.people {
+  text-align: center;
+  font-weight: 600;
+  color: #3498db;
+  min-width: 60px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .massage-books-table-wrapper {
+    font-size: 0.8rem;
+  }
+  
+  .massage-books-table th,
+  .massage-books-table td {
+    padding: 0.5rem;
+  }
+  
+  .massages,
+  .comments {
+    max-width: 150px;
+  }
+} 

@@ -42,10 +42,17 @@ class Client(models.Model):
         return f"{self.name} {self.surname}"
 
 class GiftVoucher(models.Model):
+    STATUS_CHOICES = [
+        ('pending_payment', 'Pendiente pago'),
+        ('paid', 'Pagado'),
+        ('used', 'Usado'),
+    ]
     code = models.CharField(max_length=255, unique=True, verbose_name="Código")
     bought_date = models.DateTimeField(default=timezone.now, verbose_name="Fecha de compra")
-    price = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Precio")
-    used = models.BooleanField(default=False, verbose_name="Usado")
+    payment_date = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de pago")
+    people = models.IntegerField(default=1, verbose_name="Nº personas")
+    price = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Precio", default=0.00)
+    status = models.CharField(max_length=255, choices=STATUS_CHOICES, verbose_name="Estado", default='pending_payment')
     recipients_email = models.CharField(max_length=255, null=True, blank=True, verbose_name="Email del destinatario")
     recipients_name = models.CharField(max_length=255, null=True, blank=True, verbose_name="Nombre del destinatario")
     recipients_surname = models.CharField(max_length=255, null=True, blank=True, verbose_name="Apellidos del destinatario")

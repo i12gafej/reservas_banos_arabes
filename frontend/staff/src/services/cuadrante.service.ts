@@ -6,6 +6,8 @@
 
 import { getProductBathTypes } from './productos.service';
 import { getDayAvailability as getMasajistasAvailability, AvailabilityRange as MasajistaAvailabilityRange } from './masajistas.service';
+import { getBookDetail, BookDetail } from './reservas.service';
+import type { MassageReservation } from '@/components/timetable/MassageGrid';
 
 const BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 
@@ -179,21 +181,35 @@ export async function updateCapacity(id: number, value: number): Promise<Capacit
 
 export interface StaffBath {
   massage_type: 'relax' | 'exfoliation' | 'rock' | 'none';
-  minutes: '15' | '30' | '60';
+  minutes: '15' | '30' | '60' | '0';
   quantity: number;
 }
 
 export interface StaffBookingPayload {
-  name: string;
+  // Opción 1: usar cliente existente
+  client_id?: number;
+  // Opción 2: crear cliente nuevo
+  name?: string;
   surname?: string;
-  phone_number: string;
+  phone_number?: string;
   email?: string;
+  // Datos de reserva
   date: string;   // YYYY-MM-DD
   hour: string;   // HH:MM:SS
   people: number;
-  baths: StaffBath[];
+  baths?: StaffBath[];  // Opcional cuando se usa product_id
+  product_id?: number;  // Cuando se usa un cheque regalo
   comment?: string;
+  force?: boolean;  // Para saltarse validaciones de disponibilidad
   send_whatsapp?: boolean;
+  creator_type_id?: number;
+  creator_id?: number;
+}
+
+/** Obtiene el ContentType ID para GiftVoucher */
+export async function getGiftVoucherContentTypeId(): Promise<number> {
+  const response = await http<{content_type_id: number}>(`${BASE_URL}/reservas/gift-voucher-content-type/`);
+  return response.content_type_id;
 }
 
 /** Crea una reserva proveniente de la interfaz staff */
@@ -337,4 +353,82 @@ async function calculateMinutosOcupados(bookings: Booking[]): Promise<number> {
   }
   
   return totalMinutos;
+}
+
+// --------------------------------------------------------------------
+// Funciones para MassageGrid
+// --------------------------------------------------------------------
+
+/**
+ * Formatea los masajes de un producto en formato legible
+ * Ejemplo: "2x Relajante 60', 1x Exfoliante 30'"
+ */
+function formatMassages(productBaths: BookDetail['product_baths']): string {
+  if (!productBaths || productBaths.length === 0) {
+    return '';
+  }
+
+  // Mapeo de tipos de masaje a español
+  const massageTypeSpanish = {
+    'relax': 'Relajante',
+    'rock': 'Piedras',
+    'exfoliation': 'Exfoliante',
+    'none': 'Baño'
+  };
+
+  // Filtrar solo masajes (no baños sin masaje) y formatear
+  const massageDescriptions = productBaths
+    .filter(bath => bath.massage_type !== 'none' && bath.massage_duration !== '0')
+    .map(bath => {
+      const spanishType = massageTypeSpanish[bath.massage_type as keyof typeof massageTypeSpanish] || bath.massage_type;
+      return `${bath.quantity}x ${spanishType} ${bath.massage_duration}'`;
+    });
+
+  return massageDescriptions.join(', ');
+}
+
+/**
+ * Obtiene las reservas con masajes para una fecha específica
+ */
+export async function getMassageReservationsForDate(date: string): Promise<MassageReservation[]> {
+  try {
+    // Obtener todas las reservas del día
+    const bookings = await getBookingsByDate(date);
+    
+    // Obtener detalles de cada reserva para acceder a los masajes
+    const massageReservations: MassageReservation[] = [];
+    
+    for (const booking of bookings) {
+      if (!booking.id) continue;
+      
+      try {
+        const bookDetail = await getBookDetail(booking.id);
+        
+        // Formatear masajes
+        const massages = formatMassages(bookDetail.product_baths);
+        
+        // Solo incluir si tiene masajes
+        if (massages && massages.trim() !== '') {
+          massageReservations.push({
+            id: booking.id,
+            clientName: `${bookDetail.client_name} ${bookDetail.client_surname}`.trim(),
+            clientPhone: bookDetail.client_phone,
+            hour: booking.hour?.substring(0, 5) || '00:00', // Solo HH:MM
+            people: booking.people,
+            comment: booking.comment || '',
+            massages: massages
+          });
+        }
+      } catch (error) {
+        console.error(`Error obteniendo detalles de reserva ${booking.id}:`, error);
+      }
+    }
+    
+    // Ordenar por hora de llegada
+    return massageReservations.sort((a, b) => a.hour.localeCompare(b.hour));
+    
+  } catch (error) {
+    console.error('Error obteniendo reservas con masajes:', error);
+    return [];
+  }
 }

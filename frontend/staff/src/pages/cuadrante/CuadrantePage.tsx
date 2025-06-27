@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import ReactiveButton from 'reactive-button';
 import { DefaultDialog, DatePicker } from '@/components/elements';
 import { GeneralSearch } from '@/components/common';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import PhoneInput from 'react-phone-input-2';
 import esLocale from 'react-phone-input-2/lang/es.json';
 import 'react-phone-input-2/lib/style.css';
-import { getCapacity, updateCapacity, Capacity, createStaffBooking, StaffBath, calculateCuadrante, CuadranteCalculated, getBookingsByDate, Booking, getClientById, Client } from '@/services/cuadrante.service';
+import { findSimilarClients, Client as ClienteService } from '@/services/clientes.service';
+import { getCapacity, updateCapacity, Capacity, createStaffBooking, StaffBath, calculateCuadrante, CuadranteCalculated, getBookingsByDate, Booking, getClientById, Client, getGiftVoucherContentTypeId, getMassageReservationsForDate } from '@/services/cuadrante.service';
 import { getConstraintByDate, saveConstraintForDate, constraintRangesToCells, Constraint } from '@/services/restricciones.service';
 import TimeGrid from '@/components/timetable/TimeGrid';
 import BookGrid, { BookRow } from '@/components/timetable/BookGrid';
+import { MassageGrid, MassageReservation } from '@/components/timetable';
 import './cuadrante.css';
 import { toLocalISODate } from '@/utils/date';
 
@@ -24,6 +26,7 @@ const CuadrantePage: React.FC = () => {
   const [cuadranteData, setCuadranteData] = useState<CuadranteCalculated | null>(null);
   const [loadingCuadrante, setLoadingCuadrante] = useState(false);
   const [bookings, setBookings] = useState<BookRow[]>([]);
+  const [massageReservations, setMassageReservations] = useState<MassageReservation[]>([]);
   
   // Restricciones
   const [constraintCells, setConstraintCells] = useState<boolean[]>(Array(25).fill(false));
@@ -32,6 +35,21 @@ const CuadrantePage: React.FC = () => {
 
   // Cheque regalo
   const [selectedGiftVoucher, setSelectedGiftVoucher] = useState<number | null>(null);
+  const [selectedGiftVoucherProductId, setSelectedGiftVoucherProductId] = useState<number | null>(null);
+
+  // Modal de selección de clientes
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [similarClients, setSimilarClients] = useState<ClienteService[]>([]);
+  const [selectedClient, setSelectedClient] = useState<ClienteService | null>(null);
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [clientSelectionData, setClientSelectionData] = useState<{
+    name: string;
+    surname: string;
+    email: string;
+    phone_number: string;
+  } | null>(null);
+
 
   const handleSaveAforo = async () => {
     if (draftAforo === '') {
@@ -59,11 +77,12 @@ const CuadrantePage: React.FC = () => {
     try {
       const dateStr = toLocalISODate(selectedDate);
       
-      // Cargar cuadrante, reservas y restricciones en paralelo
-      const [cuadranteData, bookingsData, constraintData] = await Promise.all([
+      // Cargar cuadrante, reservas, restricciones y masajes en paralelo
+      const [cuadranteData, bookingsData, constraintData, massageData] = await Promise.all([
         calculateCuadrante(dateStr),
         getBookingsByDate(dateStr),
-        getConstraintByDate(dateStr)
+        getConstraintByDate(dateStr),
+        getMassageReservationsForDate(dateStr)
       ]);
       
       setCuadranteData(cuadranteData);
@@ -110,6 +129,9 @@ const CuadrantePage: React.FC = () => {
       });
       
       setBookings(convertedBookings);
+      
+      // Cargar reservas de masajes
+      setMassageReservations(massageData);
       
       // Cargar restricciones
       if (constraintData) {
@@ -169,6 +191,7 @@ const CuadrantePage: React.FC = () => {
     control,
     reset,
     setValue,
+    getValues,
   } = useForm<FormInputs>({
     defaultValues: {
       hour: '10:00',
@@ -182,6 +205,23 @@ const CuadrantePage: React.FC = () => {
       massage15Relax: 0,
     } as any,
   });
+
+  // Observar cambios en tiempo real para validación
+  const people = useWatch({ control, name: 'people' }) || 0;
+  const massage60Relax = useWatch({ control, name: 'massage60Relax' }) || 0;
+  const massage60Piedra = useWatch({ control, name: 'massage60Piedra' }) || 0;
+  const massage60Exfol = useWatch({ control, name: 'massage60Exfol' }) || 0;
+  const massage30Relax = useWatch({ control, name: 'massage30Relax' }) || 0;
+  const massage30Piedra = useWatch({ control, name: 'massage30Piedra' }) || 0;
+  const massage30Exfol = useWatch({ control, name: 'massage30Exfol' }) || 0;
+  const massage15Relax = useWatch({ control, name: 'massage15Relax' }) || 0;
+
+  // Calcular totales en tiempo real
+  const totalMassages = Number(massage60Relax) + Number(massage60Piedra) + Number(massage60Exfol) + 
+                       Number(massage30Relax) + Number(massage30Piedra) + Number(massage30Exfol) + 
+                       Number(massage15Relax);
+  
+  const hasValidationError = Number(people) > 0 && totalMassages > Number(people);
 
   const onSubmit = async (data: FormInputs) => {
     try {
@@ -201,7 +241,134 @@ const CuadrantePage: React.FC = () => {
       pushBath('exfoliation', '30', data.massage30Exfol);
       pushBath('relax', '15', data.massage15Relax);
 
-      const payload = {
+      // VALIDACIÓN: Verificar que no hay más masajes que personas
+      const totalMassages = baths.reduce((total, bath) => total + bath.quantity, 0);
+      if (totalMassages > data.people) {
+        alert(`Hay más masajes (${totalMassages}) que personas (${data.people}). Por favor, reduce la cantidad de masajes o aumenta el número de personas.`);
+        return;
+      }
+
+      // CRÍTICO: Agregar baños sin masaje para las personas restantes
+      const peopleWithoutMassage = data.people - totalMassages;
+      if (peopleWithoutMassage > 0) {
+        baths.push({ 
+          massage_type: 'none', 
+          minutes: '0', 
+          quantity: peopleWithoutMassage 
+        });
+      }
+
+      // Si no hay masajes, agregar baños sin masaje para todas las personas
+      if (baths.length === 0) {
+        baths.push({
+          massage_type: 'none',
+          minutes: '0',
+          quantity: data.people
+        });
+      }
+
+      // Verificar si existen clientes similares (solo si no es desde cheque regalo)
+      // NOTA: No usamos selectedClientId aquí porque queremos que el formulario 
+      // responda a los cambios del usuario después de errores
+      if (!selectedGiftVoucher) {
+        const searchData = {
+          name: data.name,
+          surname: data.surname,
+          email: data.email,
+          phone_number: data.phone,
+        };
+
+        try {
+          const clients = await findSimilarClients(searchData);
+          if (clients.length > 0) {
+            // Mostrar modal de selección
+            setClientSelectionData(searchData);
+            setSimilarClients(clients);
+            setSelectedClient(clients[0]);
+            setShowClientModal(true);
+            return; // Pausar aquí hasta que el usuario decida
+          }
+        } catch (err) {
+          console.error('Error buscando clientes similares:', err);
+        }
+      }
+
+      // Si no hay clientes similares o es desde cheque regalo, crear reserva normalmente
+      await createBookingWithNewClient(data, baths);
+    } catch (err) {
+      console.error('Error creando reserva', err);
+      alert('Error al insertar reserva');
+    }
+  };
+
+  // Función auxiliar para crear reserva con client_id existente
+  const createBookingWithClientId = async (data: FormInputs, baths: StaffBath[], clientId: number) => {
+    try {
+      const payload: any = {
+        client_id: clientId,
+        date: data.day ? toLocalISODate(data.day) : toLocalISODate(new Date()),
+        hour: data.hour + ':00',
+        people: data.people,
+        comment: data.comments,
+        force: data.force,  // Usar el valor del checkbox
+        send_whatsapp: data.sendWhatsapp,
+      };
+
+      // Si se ha seleccionado un cheque regalo, usar su producto y agregar información del creator
+      if (selectedGiftVoucher && selectedGiftVoucherProductId) {
+        const contentTypeId = await getGiftVoucherContentTypeId();
+        payload.creator_type_id = contentTypeId;
+        payload.creator_id = selectedGiftVoucher;
+        payload.product_id = selectedGiftVoucherProductId;
+      } else {
+        payload.baths = baths;
+      }
+
+      const created = await createStaffBooking(payload);
+      console.log('Reserva creada', created);
+      alert('Reserva insertada correctamente');
+      // Solo limpiar formulario si la reserva se insertó correctamente
+      resetForm();
+    } catch (err) {
+      console.error('Error creando reserva con client_id:', err);
+      
+      // Extraer mensaje de error del backend
+      let errorMessage = 'Error desconocido';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        // Si el error contiene JSON del backend, extraer el detail
+        try {
+          const errorParts = errorMessage.split(' – ');
+          if (errorParts.length > 1) {
+            const jsonPart = errorParts[errorParts.length - 1];
+            const errorData = JSON.parse(jsonPart);
+            if (errorData.detail) {
+              errorMessage = errorData.detail;
+            }
+          }
+        } catch {
+          // Si no se puede parsear, usar el mensaje original
+        }
+      }
+      
+      // Mostrar mensaje de error específico
+      if (errorMessage.includes('No se puede reservar') || 
+          errorMessage.includes('No hay suficiente aforo') || 
+          errorMessage.includes('restricciones horarias')) {
+        alert(`Error de validación: ${errorMessage}`);
+      } else {
+        alert(`Error al insertar reserva: ${errorMessage}`);
+      }
+      
+      // Limpiar solo estados internos, mantener datos del formulario para correcciones
+      resetInternalStates();
+    }
+  };
+
+  // Función auxiliar para crear reserva con datos de nuevo cliente
+  const createBookingWithNewClient = async (data: FormInputs, baths: StaffBath[]) => {
+    try {
+      const payload: any = {
         name: data.name,
         surname: data.surname,
         phone_number: data.phone,
@@ -209,17 +376,76 @@ const CuadrantePage: React.FC = () => {
         date: data.day ? toLocalISODate(data.day) : toLocalISODate(new Date()),
         hour: data.hour + ':00',
         people: data.people,
-        baths,
         comment: data.comments,
-        send_whatsapp: data.sendWhatsapp,
+        force: data.force,  // Usar el valor del checkbox
       };
+
+      // Si se ha seleccionado un cheque regalo, usar su producto y agregar información del creator
+      if (selectedGiftVoucher && selectedGiftVoucherProductId) {
+        const contentTypeId = await getGiftVoucherContentTypeId();
+        payload.creator_type_id = contentTypeId;
+        payload.creator_id = selectedGiftVoucher;
+        payload.product_id = selectedGiftVoucherProductId;
+      } else {
+        payload.baths = baths;
+      }
 
       const created = await createStaffBooking(payload);
       console.log('Reserva creada', created);
-      reset();
+      alert('Reserva insertada correctamente');
+      // Solo limpiar formulario si la reserva se insertó correctamente
+      resetForm();
     } catch (err) {
-      console.error('Error creando reserva', err);
+      console.error('Error creando reserva con nuevos datos:', err);
+      
+      // Extraer mensaje de error del backend
+      let errorMessage = 'Error desconocido';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        // Si el error contiene JSON del backend, extraer el detail
+        try {
+          const errorParts = errorMessage.split(' – ');
+          if (errorParts.length > 1) {
+            const jsonPart = errorParts[errorParts.length - 1];
+            const errorData = JSON.parse(jsonPart);
+            if (errorData.detail) {
+              errorMessage = errorData.detail;
+            }
+          }
+        } catch {
+          // Si no se puede parsear, usar el mensaje original
+        }
+      }
+      
+      // Mostrar mensaje de error específico
+      if (errorMessage.includes('No se puede reservar') || 
+          errorMessage.includes('No hay suficiente aforo') || 
+          errorMessage.includes('restricciones horarias')) {
+        alert(`Error de validación: ${errorMessage}`);
+      } else {
+        alert(`Error al insertar reserva: ${errorMessage}`);
+      }
+      
+      // Limpiar solo estados internos, mantener datos del formulario para correcciones
+      resetInternalStates();
     }
+  };
+
+  // Función para resetear solo los estados internos (sin tocar el formulario)
+  const resetInternalStates = () => {
+    setSelectedGiftVoucher(null);
+    setSelectedGiftVoucherProductId(null);
+    setClientSelectionData(null);
+    setSimilarClients([]);
+    setSelectedClient(null);
+    setShowNewClientForm(false);
+    setShowClientModal(false);
+  };
+
+  // Función para resetear el formulario y estados
+  const resetForm = () => {
+    reset();
+    resetInternalStates();
   };
 
   // Guardar restricciones
@@ -256,6 +482,7 @@ const CuadrantePage: React.FC = () => {
     setValue('email', clientData.email);
     // Limpiar cheque regalo si se selecciona un cliente normal
     setSelectedGiftVoucher(null);
+    setSelectedGiftVoucherProductId(null);
   };
 
   // Manejar selección de cheque regalo
@@ -264,12 +491,21 @@ const CuadrantePage: React.FC = () => {
     surname: string;
     phone_number: string;
     email: string;
-  }) => {
+  }, productBaths?: Array<{
+    massage_type: 'relax' | 'rock' | 'exfoliation' | 'none';
+    massage_duration: '15' | '30' | '60' | '0';
+    quantity: number;
+  }>, people?: number, productId?: number) => {
     // Autocompletar campos del formulario con datos del cliente
     setValue('name', clientData.name);
     setValue('surname', clientData.surname);
     setValue('phone', clientData.phone_number);
     setValue('email', clientData.email);
+    
+    // Autocompletar número de personas
+    if (people) {
+      setValue('people', people);
+    }
     
     // Limpiar campos de masaje
     setValue('massage60Relax', 0);
@@ -280,8 +516,21 @@ const CuadrantePage: React.FC = () => {
     setValue('massage30Exfol', 0);
     setValue('massage15Relax', 0);
     
+    // Autocompletar masajes desde el producto del cheque regalo
+    if (productBaths) {
+      productBaths.forEach(bath => {
+        if (bath.massage_type === 'none') return; // Saltar baños sin masaje
+        
+        const fieldName = `massage${bath.massage_duration}${bath.massage_type === 'relax' ? 'Relax' : 
+          bath.massage_type === 'rock' ? 'Piedra' : 'Exfol'}` as keyof FormInputs;
+        
+        setValue(fieldName as any, bath.quantity);
+      });
+    }
+    
     // Establecer cheque regalo seleccionado
     setSelectedGiftVoucher(giftVoucherId);
+    setSelectedGiftVoucherProductId(productId || null);
   };
 
   // Manejar cambios en las restricciones
@@ -289,6 +538,139 @@ const CuadrantePage: React.FC = () => {
     const booleanCells = newCells.map(cell => Boolean(cell));
     setConstraintCells(booleanCells);
     setConstraintChanged(true);
+  };
+
+  // Funciones para el modal de selección de clientes
+  const handleUseExistingClient = async () => {
+    if (selectedClient) {
+      setShowClientModal(false);
+      // Crear reserva directamente con el cliente seleccionado
+      const formData = getFormData();
+      if (formData) {
+        // Construir baths igual que en onSubmit
+        const baths: StaffBath[] = [];
+        const pushBath = (type: 'relax' | 'exfoliation' | 'rock', minutes: '60' | '30' | '15', qty: number) => {
+          if (qty && qty > 0) {
+            baths.push({ massage_type: type, minutes, quantity: qty });
+          }
+        };
+
+        pushBath('relax', '60', formData.massage60Relax);
+        pushBath('rock', '60', formData.massage60Piedra);
+        pushBath('exfoliation', '60', formData.massage60Exfol);
+        pushBath('relax', '30', formData.massage30Relax);
+        pushBath('rock', '30', formData.massage30Piedra);
+        pushBath('exfoliation', '30', formData.massage30Exfol);
+        pushBath('relax', '15', formData.massage15Relax);
+
+        const totalMassages = baths.reduce((total, bath) => total + bath.quantity, 0);
+        const peopleWithoutMassage = formData.people - totalMassages;
+        if (peopleWithoutMassage > 0) {
+          baths.push({ 
+            massage_type: 'none', 
+            minutes: '0', 
+            quantity: peopleWithoutMassage 
+          });
+        }
+
+        if (baths.length === 0) {
+          baths.push({
+            massage_type: 'none',
+            minutes: '0',
+            quantity: formData.people
+          });
+        }
+
+        await createBookingWithClientId(formData, baths, selectedClient.id);
+      }
+    }
+  };
+
+  const handleCreateNewClientFromModal = () => {
+    setShowNewClientForm(true);
+  };
+
+  const handleCancelNewClient = () => {
+    setShowNewClientForm(false);
+  };
+
+  const handleConfirmNewClient = async (finalClientData: {
+    name: string;
+    surname: string;
+    email: string;
+    phone_number: string;
+  }) => {
+    // Actualizar los campos del formulario con los datos finales
+    setValue('name', finalClientData.name);
+    setValue('surname', finalClientData.surname);
+    setValue('email', finalClientData.email);
+    setValue('phone', finalClientData.phone_number);
+
+    setShowClientModal(false);
+    setShowNewClientForm(false);
+    
+    // Obtener datos actuales del formulario y crear reserva
+    const formData = getFormData();
+    if (formData) {
+      // Actualizar formData con los nuevos datos del cliente
+      const updatedFormData = {
+        ...formData,
+        name: finalClientData.name,
+        surname: finalClientData.surname,
+        email: finalClientData.email,
+        phone: finalClientData.phone_number,
+      };
+
+      // Construir baths igual que en onSubmit
+      const baths: StaffBath[] = [];
+      const pushBath = (type: 'relax' | 'exfoliation' | 'rock', minutes: '60' | '30' | '15', qty: number) => {
+        if (qty && qty > 0) {
+          baths.push({ massage_type: type, minutes, quantity: qty });
+        }
+      };
+
+      pushBath('relax', '60', updatedFormData.massage60Relax);
+      pushBath('rock', '60', updatedFormData.massage60Piedra);
+      pushBath('exfoliation', '60', updatedFormData.massage60Exfol);
+      pushBath('relax', '30', updatedFormData.massage30Relax);
+      pushBath('rock', '30', updatedFormData.massage30Piedra);
+      pushBath('exfoliation', '30', updatedFormData.massage30Exfol);
+      pushBath('relax', '15', updatedFormData.massage15Relax);
+
+      const totalMassages = baths.reduce((total, bath) => total + bath.quantity, 0);
+      const peopleWithoutMassage = updatedFormData.people - totalMassages;
+      if (peopleWithoutMassage > 0) {
+        baths.push({ 
+          massage_type: 'none', 
+          minutes: '0', 
+          quantity: peopleWithoutMassage 
+        });
+      }
+
+      if (baths.length === 0) {
+        baths.push({
+          massage_type: 'none',
+          minutes: '0',
+          quantity: updatedFormData.people
+        });
+      }
+
+      await createBookingWithNewClient(updatedFormData, baths);
+    }
+  };
+
+  const handleCloseClientModal = () => {
+    setShowClientModal(false);
+    setShowNewClientForm(false);
+    setClientSelectionData(null);
+    setSimilarClients([]);
+    setSelectedClient(null);
+  };
+
+  // Función auxiliar para obtener datos del formulario
+  const getFormData = (): FormInputs | null => {
+    const formData = getValues();
+    return formData;
   };
 
   // Preparar datos para TimeGrid
@@ -484,7 +866,10 @@ const CuadrantePage: React.FC = () => {
                         🎁 Usando cheque regalo con ID #{selectedGiftVoucher}
                         <button
                           type="button"
-                          onClick={() => setSelectedGiftVoucher(null)}
+                          onClick={() => {
+                            setSelectedGiftVoucher(null);
+                            setSelectedGiftVoucherProductId(null);
+                          }}
                           style={{
                             marginLeft: '0.5rem',
                             padding: '0.25rem 0.5rem',
@@ -523,7 +908,7 @@ const CuadrantePage: React.FC = () => {
                                   <input 
                                     type="number" 
                                     min={0} 
-                                    {...register(nameKey as any)} 
+                                    {...register(nameKey as any, { valueAsNumber: true, min: 0 })} 
                                     style={{ width: '50%' }} 
                                     disabled={selectedGiftVoucher !== null}
                                   />
@@ -534,6 +919,32 @@ const CuadrantePage: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+                    
+                    {/* Mensaje de validación */}
+                    {hasValidationError && (
+                      <div style={{
+                        marginTop: '0.5rem',
+                        padding: '0.5rem',
+                        backgroundColor: '#fee2e2',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '4px',
+                        color: '#dc2626',
+                        fontSize: '0.875rem',
+                        textAlign: 'center'
+                      }}>
+                        ⚠️ Hay más masajes ({totalMassages}) que personas ({people})
+                      </div>
+                    )}
+                    
+                    {/* Información de ayuda */}
+                    <div style={{
+                      marginTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      textAlign: 'center'
+                    }}>
+                      Total masajes: {totalMassages} | Personas: {people}
+                    </div>
                   </div>
 
                   {/* Col 4: whatsapp & comentarios */}
@@ -550,10 +961,11 @@ const CuadrantePage: React.FC = () => {
                       style={{ marginTop: '0.5rem' }}
                     />
                     <ReactiveButton
-                    style={{ backgroundColor: 'var(--color-primary)', marginTop: '0.5rem' }}
-                    idleText="Insertar"
+                    style={{ backgroundColor: hasValidationError ? '#9ca3af' : 'var(--color-primary)', marginTop: '0.5rem' }}
+                    idleText={hasValidationError ? "Corrige los errores primero" : "Insertar"}
                     type="submit"
                     width={"100%"}
+                    disabled={hasValidationError}
                   />
                   </div>
                 </div>
@@ -599,6 +1011,9 @@ const CuadrantePage: React.FC = () => {
               />
             </div>
           )}
+          
+          {/* Lista de masajes */}
+          <MassageGrid reservations={massageReservations} />
         </div>
       )}
 
@@ -622,6 +1037,419 @@ const CuadrantePage: React.FC = () => {
           />
         </label>
       </DefaultDialog>
+
+      {/* Modal de selección de clientes */}
+      <DefaultDialog
+        open={showClientModal}
+        title={showNewClientForm ? "Crear Nuevo Cliente" : "Cliente Existente Encontrado"}
+        onClose={handleCloseClientModal}
+        width="900px"
+      >
+        {loadingClients ? (
+          <p>Buscando clientes similares...</p>
+        ) : showNewClientForm ? (
+          // Formulario de nuevo cliente
+          <ClientNewForm 
+            selectedClient={selectedClient}
+            searchData={clientSelectionData || { name: '', surname: '', email: '', phone_number: '' }}
+            onConfirm={handleConfirmNewClient}
+            onCancel={handleCancelNewClient}
+          />
+        ) : similarClients.length === 0 ? (
+          <p>No se encontraron clientes similares. Se procederá a crear un cliente nuevo.</p>
+        ) : (
+          // Vista principal de selección
+          <ClientSelectionContent
+            similarClients={similarClients}
+            selectedClient={selectedClient}
+            onClientSelect={setSelectedClient}
+            onUseExisting={handleUseExistingClient}
+            onCreateNew={handleCreateNewClientFromModal}
+            searchData={clientSelectionData || { name: '', surname: '', email: '', phone_number: '' }}
+            onConfirmNewClient={handleConfirmNewClient}
+          />
+        )}
+      </DefaultDialog>
+    </div>
+  );
+};
+
+// Componente auxiliar para el contenido de selección de clientes
+const ClientSelectionContent: React.FC<{
+  similarClients: ClienteService[];
+  selectedClient: ClienteService | null;
+  onClientSelect: (client: ClienteService) => void;
+  onUseExisting: () => void;
+  onCreateNew: () => void;
+  searchData: { name: string; surname: string; email: string; phone_number: string };
+  onConfirmNewClient: (data: { name: string; surname: string; email: string; phone_number: string }) => void;
+}> = ({ similarClients, selectedClient, onClientSelect, onUseExisting, onCreateNew, searchData, onConfirmNewClient }) => {
+  const [showNewClientForm, setShowNewClientForm] = React.useState(false);
+  const getMatchBadges = (client: ClienteService): string[] => {
+    if (!client.match_info) return [];
+    
+    const badges: string[] = [];
+    if (client.match_info.email) badges.push('📧 Email');
+    if (client.match_info.phone) badges.push('📞 Teléfono');
+    if (client.match_info.name) badges.push('👤 Nombre');
+    if (client.match_info.surname) badges.push('👥 Apellidos');
+    if (client.match_info.name_surname_combo) badges.push('🔗 Nombre+Apellidos');
+    
+    return badges;
+  };
+
+  const handleCreateNewClick = () => {
+    setShowNewClientForm(true);
+  };
+
+  const handleCancelNewClient = () => {
+    setShowNewClientForm(false);
+  };
+
+  const handleConfirmNewClient = (finalData: { name: string; surname: string; email: string; phone_number: string }) => {
+    onConfirmNewClient(finalData);
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1rem', height: '400px' }}>
+      {/* Lista de clientes (izquierda) */}
+      <div style={{ border: '1px solid #ddd', borderRadius: '4px', overflow: 'hidden' }}>
+        <h4 style={{ margin: 0, padding: '0.75rem', backgroundColor: '#f5f5f5', borderBottom: '1px solid #ddd' }}>
+          CLIENTES
+        </h4>
+        <div style={{ height: '350px', overflowY: 'auto' }}>
+          {similarClients.map((client) => (
+            <div
+              key={client.id}
+              onClick={() => onClientSelect(client)}
+              style={{
+                padding: '0.75rem',
+                borderBottom: '1px solid #eee',
+                cursor: 'pointer',
+                backgroundColor: selectedClient?.id === client.id ? '#e3f2fd' : 'white',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                {client.name} {client.surname}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+                {client.email || 'Sin email'} | {client.phone_number || 'Sin teléfono'}
+              </div>
+              
+              {/* Badges de coincidencias */}
+              <div style={{ marginTop: '0.5rem' }}>
+                {getMatchBadges(client).map((badge, index) => (
+                  <span
+                    key={index}
+                    style={{
+                      display: 'inline-block',
+                      fontSize: '0.7rem',
+                      padding: '0.2rem 0.4rem',
+                      backgroundColor: '#e0f7fa',
+                      color: '#00695c',
+                      borderRadius: '3px',
+                      marginRight: '0.25rem',
+                      marginBottom: '0.25rem',
+                    }}
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Panel derecho con información del cliente seleccionado */}
+      <div style={{ border: '1px solid #ddd', borderRadius: '4px', padding: '1rem' }}>
+        {selectedClient ? (
+          <div>
+            <p style={{ fontSize: '0.9rem', color: '#333', marginBottom: '0.75rem' }}>
+              <strong>Ya existe un cliente con esta información:</strong>
+            </p>
+            
+            <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem' }}>
+              <p style={{ margin: '0.25rem 0' }}><strong>Nombre:</strong> {selectedClient.name} {selectedClient.surname}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Teléfono:</strong> {selectedClient.phone_number || 'No disponible'}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Correo:</strong> {selectedClient.email || 'No disponible'}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Fecha creación:</strong> {selectedClient.created_at ? new Date(selectedClient.created_at).toLocaleDateString('es-ES') : 'No disponible'}</p>
+            </div>
+
+            {!showNewClientForm && (
+              <>
+                <p style={{ marginBottom: '1rem', color: '#666', fontSize: '0.85rem' }}>
+                  ¿Te gustaría utilizar este cliente para la reserva, o prefieres crear uno nuevo?
+                </p>
+
+                {/* Botones principales */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <ReactiveButton
+                    style={{ backgroundColor: '#6c757d' }}
+                    idleText="Crear uno nuevo"
+                    onClick={handleCreateNewClick}
+                  />
+                  <ReactiveButton
+                    style={{ backgroundColor: 'var(--color-primary)' }}
+                    idleText="Utilizar este cliente"
+                    onClick={onUseExisting}
+                  />
+                </div>
+              </>
+            )}
+
+            {showNewClientForm && (
+              <ClientNewFormInline 
+                selectedClient={selectedClient}
+                searchData={searchData}
+                onConfirm={handleConfirmNewClient}
+                onCancel={handleCancelNewClient}
+              />
+            )}
+          </div>
+        ) : (
+          <p>Selecciona un cliente de la lista para ver su información.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Componente auxiliar para el formulario de nuevo cliente
+const ClientNewForm: React.FC<{
+  selectedClient: ClienteService | null;
+  searchData: { name: string; surname: string; email: string; phone_number: string };
+  onConfirm: (data: { name: string; surname: string; email: string; phone_number: string }) => void;
+  onCancel: () => void;
+}> = ({ selectedClient, searchData, onConfirm, onCancel }) => {
+  type FieldSource = 'existing' | 'new';
+  
+  const [sources, setSources] = React.useState<{
+    nameSource: FieldSource;
+    surnameSource: FieldSource;
+    emailSource: FieldSource;
+    phoneSource: FieldSource;
+  }>({
+    nameSource: 'new',
+    surnameSource: 'new',
+    emailSource: 'new',
+    phoneSource: 'new',
+  });
+
+  const getFieldValue = (field: 'name' | 'surname' | 'email' | 'phone_number'): string => {
+    const sourceField = `${field === 'phone_number' ? 'phone' : field}Source` as keyof typeof sources;
+    const source = sources[sourceField];
+    
+    if (source === 'existing' && selectedClient) {
+      return (selectedClient[field] || '') as string;
+    }
+    return searchData[field] || '';
+  };
+
+  const handleConfirm = () => {
+    const finalData = {
+      name: getFieldValue('name'),
+      surname: getFieldValue('surname'),
+      email: getFieldValue('email'),
+      phone_number: getFieldValue('phone_number'),
+    };
+    onConfirm(finalData);
+  };
+
+  const updateSource = (field: keyof typeof sources, value: FieldSource) => {
+    setSources(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <div>
+      <p style={{ marginBottom: '1rem', color: '#666' }}>
+        Selecciona qué datos usar para el nuevo cliente:
+      </p>
+      
+      {selectedClient && (
+        <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+          <h4>Cliente seleccionado: {selectedClient.name} {selectedClient.surname}</h4>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 150px', gap: '0.5rem', alignItems: 'center' }}>
+        {/* Headers */}
+        <div></div>
+        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem' }}>Del cliente existente</div>
+        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem' }}>Del formulario nuevo</div>
+
+        {/* Campos */}
+        {[
+          { field: 'nameSource', label: 'Nombre:', existing: selectedClient?.name, new: searchData.name },
+          { field: 'surnameSource', label: 'Apellidos:', existing: selectedClient?.surname, new: searchData.surname },
+          { field: 'emailSource', label: 'Email:', existing: selectedClient?.email, new: searchData.email },
+          { field: 'phoneSource', label: 'Teléfono:', existing: selectedClient?.phone_number, new: searchData.phone_number },
+        ].map(({ field, label, existing, new: newValue }) => (
+          <React.Fragment key={field}>
+            <div style={{ fontWeight: 'bold' }}>{label}</div>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <input
+                type="radio"
+                name={field}
+                checked={sources[field as keyof typeof sources] === 'existing'}
+                onChange={() => updateSource(field as keyof typeof sources, 'existing')}
+                disabled={!existing}
+              />
+              <span style={{ marginLeft: '0.25rem', fontSize: '0.8rem' }}>{existing || 'N/A'}</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <input
+                type="radio"
+                name={field}
+                checked={sources[field as keyof typeof sources] === 'new'}
+                onChange={() => updateSource(field as keyof typeof sources, 'new')}
+              />
+              <span style={{ marginLeft: '0.25rem', fontSize: '0.8rem' }}>{newValue || 'N/A'}</span>
+            </label>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Vista previa del nuevo cliente */}
+      <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#e8f4fd', borderRadius: '4px' }}>
+        <h4>Vista previa del nuevo cliente:</h4>
+        <p><strong>Nombre:</strong> {getFieldValue('name')}</p>
+        <p><strong>Apellidos:</strong> {getFieldValue('surname')}</p>
+        <p><strong>Email:</strong> {getFieldValue('email')}</p>
+        <p><strong>Teléfono:</strong> {getFieldValue('phone_number')}</p>
+      </div>
+
+      {/* Botones del formulario de nuevo cliente */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+        <ReactiveButton
+          style={{ backgroundColor: '#6c757d' }}
+          idleText="Cancelar"
+          onClick={onCancel}
+        />
+        <ReactiveButton
+          style={{ backgroundColor: 'var(--color-primary)' }}
+          idleText="Crear Cliente"
+          onClick={handleConfirm}
+        />
+      </div>
+    </div>
+  );
+};
+
+// Componente auxiliar para el formulario de nuevo cliente inline
+const ClientNewFormInline: React.FC<{
+  selectedClient: ClienteService | null;
+  searchData: { name: string; surname: string; email: string; phone_number: string };
+  onConfirm: (data: { name: string; surname: string; email: string; phone_number: string }) => void;
+  onCancel: () => void;
+}> = ({ selectedClient, searchData, onConfirm, onCancel }) => {
+  type FieldSource = 'existing' | 'new';
+  
+  const [sources, setSources] = React.useState<{
+    nameSource: FieldSource;
+    surnameSource: FieldSource;
+    emailSource: FieldSource;
+    phoneSource: FieldSource;
+  }>({
+    nameSource: 'new',
+    surnameSource: 'new',
+    emailSource: 'new',
+    phoneSource: 'new',
+  });
+
+  const getFieldValue = (field: 'name' | 'surname' | 'email' | 'phone_number'): string => {
+    const sourceField = `${field === 'phone_number' ? 'phone' : field}Source` as keyof typeof sources;
+    const source = sources[sourceField];
+    
+    if (source === 'existing' && selectedClient) {
+      return (selectedClient[field] || '') as string;
+    }
+    return searchData[field] || '';
+  };
+
+  const handleConfirm = () => {
+    const finalData = {
+      name: getFieldValue('name'),
+      surname: getFieldValue('surname'),
+      email: getFieldValue('email'),
+      phone_number: getFieldValue('phone_number'),
+    };
+    onConfirm(finalData);
+  };
+
+  const updateSource = (field: keyof typeof sources, value: FieldSource) => {
+    setSources(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <div style={{ marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '1rem' }}>
+      <p style={{ marginBottom: '0.75rem', color: '#666', fontSize: '0.85rem' }}>
+        Selecciona qué datos usar para el nuevo cliente:
+      </p>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: '0.25rem', alignItems: 'center', fontSize: '0.8rem' }}>
+        {/* Headers */}
+        <div></div>
+        <div style={{ textAlign: 'center', fontWeight: 'bold' }}>Existente</div>
+        <div style={{ textAlign: 'center', fontWeight: 'bold' }}>Nuevo</div>
+
+        {/* Campos */}
+        {[
+          { field: 'nameSource', label: 'Nombre:', existing: selectedClient?.name, new: searchData.name },
+          { field: 'surnameSource', label: 'Apellidos:', existing: selectedClient?.surname, new: searchData.surname },
+          { field: 'emailSource', label: 'Email:', existing: selectedClient?.email, new: searchData.email },
+          { field: 'phoneSource', label: 'Teléfono:', existing: selectedClient?.phone_number, new: searchData.phone_number },
+        ].map(({ field, label, existing, new: newValue }) => (
+          <React.Fragment key={field}>
+            <div style={{ fontWeight: 'bold', fontSize: '0.75rem' }}>{label}</div>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.25rem' }}>
+              <input
+                type="radio"
+                name={field}
+                checked={sources[field as keyof typeof sources] === 'existing'}
+                onChange={() => updateSource(field as keyof typeof sources, 'existing')}
+                disabled={!existing}
+                style={{ marginRight: '0.25rem' }}
+              />
+              <span style={{ fontSize: '0.7rem' }}>{existing || 'N/A'}</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.25rem' }}>
+              <input
+                type="radio"
+                name={field}
+                checked={sources[field as keyof typeof sources] === 'new'}
+                onChange={() => updateSource(field as keyof typeof sources, 'new')}
+                style={{ marginRight: '0.25rem' }}
+              />
+              <span style={{ fontSize: '0.7rem' }}>{newValue || 'N/A'}</span>
+            </label>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Vista previa del nuevo cliente */}
+      <div style={{ marginTop: '0.75rem', padding: '0.5rem', backgroundColor: '#e8f4fd', borderRadius: '4px' }}>
+        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem' }}>Vista previa:</h4>
+        <div style={{ fontSize: '0.75rem' }}>
+          <span><strong>Nombre:</strong> {getFieldValue('name')} {getFieldValue('surname')} | </span>
+          <span><strong>Email:</strong> {getFieldValue('email')} | </span>
+          <span><strong>Teléfono:</strong> {getFieldValue('phone_number')}</span>
+        </div>
+      </div>
+
+      {/* Botones del formulario de nuevo cliente */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
+        <ReactiveButton
+          style={{ backgroundColor: '#6c757d' }}
+          idleText="Cancelar"
+          onClick={onCancel}
+        />
+        <ReactiveButton
+          style={{ backgroundColor: 'var(--color-primary)' }}
+          idleText="Crear Cliente"
+          onClick={handleConfirm}
+        />
+      </div>
     </div>
   );
 };

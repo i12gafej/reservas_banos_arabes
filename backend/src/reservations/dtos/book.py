@@ -80,19 +80,30 @@ class StaffBookingPayloadDTO:
     # Opción 2: crear producto nuevo
     baths: Optional[List[StaffBathRequestDTO]] = None
     price: Optional[Decimal] = None
-    # Datos cliente y reserva
+    # Datos cliente - opción 1: usar cliente existente
+    client_id: Optional[int] = None
+    # Datos cliente - opción 2: crear cliente nuevo
     name: str = ""
     surname: str = ""
-    phone: str = ""
+    phone_number: str = ""
     email: str = ""
+    # Datos reserva
     date: str = ""
     hour: str = ""
     people: int = 1
     comment: Optional[str] = None
+    force: bool = False  # Para saltarse validaciones de disponibilidad
+    # Campos del creador (para cheques regalo)
+    creator_type_id: Optional[int] = None
+    creator_id: Optional[int] = None
 
     def validate(self):
         if not self.product_id and not self.baths:
             raise ValueError("Debe indicar product_id o baths para la reserva staff")
+        
+        # Validar que se proporcione client_id O datos del nuevo cliente
+        if not self.client_id and not self.name:
+            raise ValueError("Debe indicar client_id o los datos del cliente (name) para crear la reserva")
 
 
 @dataclass

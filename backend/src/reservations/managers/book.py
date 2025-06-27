@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
 
 from reservations.dtos.book import BookDTO, StaffBathRequestDTO, BookLogDTO, BookDetailDTO, BookMassageUpdateDTO
 from reservations.models import Book, Product, BathType, ProductBaths, Client, BookLogs, Admin, Agent, GiftVoucher, WebBooking
@@ -130,8 +131,21 @@ class BookManager:
         Book.objects.filter(id=book_id).delete()
 
     # ------------------------------------------------------------------
-    # Generación de identificador interno
+    # Helpers internos
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _handle_gift_voucher_usage(creator_type_id: int, creator_id: int):
+        """Marca un cheque regalo como usado si la reserva se crea desde uno."""
+        if creator_type_id and creator_id:
+            try:
+                content_type = ContentType.objects.get(id=creator_type_id)
+                if content_type.model == 'giftvoucher':
+                    from reservations.managers.gift_voucher import GiftVoucherManager
+                    GiftVoucherManager.mark_as_used(creator_id)
+            except Exception as e:
+                # Log el error pero no fallar la creación de la reserva
+                print(f"Error marcando cheque regalo como usado: {e}")
 
     @staticmethod
     def _generate_internal_order_id() -> str:
@@ -145,6 +159,35 @@ class BookManager:
                 break
         return new_id
 
+    @staticmethod
+    def _generate_product_name_from_baths(baths: List[StaffBathRequestDTO]) -> str:
+        """Genera un nombre descriptivo para el producto basado en los baños incluidos."""
+        if not baths:
+            return "Baño sin masaje"
+        
+        # Traducir tipos de masaje al español
+        massage_type_translations = {
+            'relax': 'Relax',
+            'rock': 'Piedras',
+            'exfoliation': 'Exfoliación',
+            'none': 'Baño'
+        }
+        
+        # Generar descripción de cada baño
+        bath_descriptions = []
+        for bath in baths:
+            massage_type = massage_type_translations.get(bath.massage_type, bath.massage_type.title())
+            
+            if bath.massage_type == 'none':
+                # Para baños sin masaje, no mostrar duración
+                bath_descriptions.append(f"{bath.quantity}x {massage_type}")
+            else:
+                # Para masajes, mostrar duración
+                bath_descriptions.append(f"{bath.quantity}x {massage_type} {bath.minutes}\'")
+        
+        # Unir todas las descripciones con comas
+        return ", ".join(bath_descriptions)
+
     # ------------------------------------------------------------------
     # Creación desde STAFF
     # ------------------------------------------------------------------
@@ -156,97 +199,277 @@ class BookManager:
         product_id: int = None,
         baths: List[StaffBathRequestDTO] = None,
         price: Decimal = None,
-        name: str,
-        surname: str,
-        phone: str,
-        email: str,
+        name: str = None,
+        surname: str = None,
+        phone: str = None,
+        email: str = None,
         date: str,
         hour: str,
         people: int,
         comment: str = "",
+        force: bool = False,  # Nuevo parámetro para saltarse validaciones
+        creator_type_id: int = None,
+        creator_id: int = None,
+        client_id: int = None,  # Nuevo parámetro opcional
     ) -> BookDTO:
-        client = Client.objects.create(
-            name=name,
-            surname=surname,
-            phone_number=phone,
-            email=email,
-        )
+        # ===== VALIDACIONES DE DISPONIBILIDAD =====
+        if not force:
+            from datetime import datetime, date as date_type, time as time_type
+            from reservations.managers.constraint import ConstraintManager
+            from reservations.models import Capacity
+            
+            # Convertir fecha y hora
+            try:
+                booking_date = datetime.strptime(date, '%Y-%m-%d').date()
+                booking_time = datetime.strptime(hour, '%H:%M:%S').time()
+            except ValueError:
+                raise ValueError("Formato de fecha u hora inválido. Use YYYY-MM-DD para fecha y HH:MM:SS para hora")
+            
+            # 1. Verificar restricciones para esa fecha y hora
+            constraint_dto = ConstraintManager.get_constraint_for_day(booking_date)
+            if constraint_dto:
+                # Verificar si la hora está en algún rango de restricción
+                for range_dto in constraint_dto.ranges:
+                    if range_dto.initial_time <= booking_time < range_dto.end_time:
+                        raise ValueError(f"No se puede reservar para las {booking_time.strftime('%H:%M')} del {booking_date.strftime('%d/%m/%Y')} debido a restricciones horarias")
+            
+            # 2. Verificar aforo disponible
+            try:
+                capacity = Capacity.objects.first()
+                if capacity:
+                    # Obtener reservas existentes para esa fecha y hora
+                    existing_bookings = BookManager.list_bookings_by_date(date)
+                    existing_people_at_hour = sum(
+                        booking.people for booking in existing_bookings 
+                        if booking.hour and booking.hour.strftime('%H:%M:%S') == hour
+                    )
+                    
+                    # Verificar si la nueva reserva excedería el aforo
+                    total_people_after_booking = existing_people_at_hour + people
+                    if total_people_after_booking > capacity.value:
+                        raise ValueError(f"No hay suficiente aforo disponible. Aforo máximo: {capacity.value}, Ya ocupado: {existing_people_at_hour}, Solicitado: {people}, Total resultante: {total_people_after_booking}")
+            except Exception as e:
+                if "No hay suficiente aforo" in str(e):
+                    raise e  # Re-lanzar errores de aforo
+                # Si hay error obteniendo capacidad, continuar sin validar aforo
+                print(f"Advertencia: No se pudo validar aforo: {e}")
+        
+        # ===== FIN VALIDACIONES DE DISPONIBILIDAD =====
+        
+        # Si se proporciona client_id, usar cliente existente
+        if client_id:
+            try:
+                client = Client.objects.get(id=client_id)
+            except Client.DoesNotExist:
+                raise ValueError(f"No existe un cliente con ID {client_id}")
+        else:
+            # Si no se proporciona client_id, crear cliente nuevo con los datos proporcionados
+            if not name:
+                raise ValueError("Se requiere 'name' para crear un nuevo cliente")
+            
+            client = Client.objects.create(
+                name=name,
+                surname=surname or "",
+                phone_number=phone or "",
+                email=email or "",
+            )
+        
+        # Verificar si viene de un cheque regalo
+        is_from_gift_voucher = False
+        gift_voucher_product_id = None
+        gift_voucher_price = Decimal("0")
+        
+        if creator_type_id and creator_id:
+            try:
+                content_type = ContentType.objects.get(id=creator_type_id)
+                if content_type.model == 'giftvoucher':
+                    from reservations.models import GiftVoucher
+                    gift_voucher = GiftVoucher.objects.select_related('product').get(id=creator_id)
+                    is_from_gift_voucher = True
+                    gift_voucher_product_id = gift_voucher.product_id
+                    gift_voucher_price = gift_voucher.price
+            except Exception as e:
+                print(f"Error obteniendo información del cheque regalo: {e}")
+        
         # Si se pasa product_id, usarlo directamente
         if product_id:
-            book = Book.objects.create(
-                internal_order_id=BookManager._generate_internal_order_id(),
-                book_date=date,
-                hour=hour,
-                people=people,
-                comment=comment,
-                amount_paid=Decimal("0"),
-                amount_pending=price or Decimal("0"),
-                client=client,
-                product_id=product_id,
-            )
+            # Si viene de cheque regalo, usar el precio del cheque como amount_paid
+            if is_from_gift_voucher:
+                amount_paid = gift_voucher_price
+                amount_pending = Decimal("0")
+            else:
+                amount_paid = Decimal("0")
+                amount_pending = price or Decimal("0")
+                
+            book_data = {
+                'internal_order_id': BookManager._generate_internal_order_id(),
+                'book_date': date,
+                'hour': hour,
+                'people': people,
+                'comment': comment,
+                'amount_paid': amount_paid,
+                'amount_pending': amount_pending,
+                'client': client,
+                'product_id': product_id,
+            }
+            
+            # Agregar creator si se proporciona
+            if creator_type_id and creator_id:
+                book_data['creator_type_id'] = creator_type_id
+                book_data['creator_id'] = creator_id
+            
+            book = Book.objects.create(**book_data)
+            
+            # Si la reserva se crea desde un cheque regalo, marcarlo como usado
+            BookManager._handle_gift_voucher_usage(creator_type_id, creator_id)
+            
+            return BookManager._to_dto(book)
+        
+        # Si viene de cheque regalo pero no se pasó product_id, usar el producto del cheque
+        if is_from_gift_voucher and gift_voucher_product_id:
+            book_data = {
+                'internal_order_id': BookManager._generate_internal_order_id(),
+                'book_date': date,
+                'hour': hour,
+                'people': people,
+                'comment': comment,
+                'amount_paid': gift_voucher_price,
+                'amount_pending': Decimal("0"),
+                'client': client,
+                'product_id': gift_voucher_product_id,
+                'creator_type_id': creator_type_id,
+                'creator_id': creator_id,
+            }
+            
+            book = Book.objects.create(**book_data)
+            
+            # Marcar cheque regalo como usado
+            BookManager._handle_gift_voucher_usage(creator_type_id, creator_id)
+            
             return BookManager._to_dto(book)
         # Si no, crear producto nuevo o buscar uno idéntico
         if not baths:
             raise ValueError("Debe indicar baths si no se pasa product_id")
-        # Buscar producto idéntico (mismos baths y precio)
-        from reservations.models import ProductBaths
-        bath_types = []
+        
+        # Asegurar que existen todos los BathTypes necesarios
+        BookManager.ensure_bath_types_exist()
+        
+        # Calcular precio total basándose en los BathTypes existentes
+        final_price = Decimal("0")
+        bath_type_details = []
+        
         for br in baths:
             br.validate()
-            bath_types.append((br.massage_type, br.minutes, br.quantity))
-        # Buscar productos con mismo precio
-        candidates = Product.objects.filter(price=price or 0)
-        for prod in candidates:
-            prod_baths = list(prod.baths.values_list('bath_type__massage_type', 'bath_type__massage_duration', 'quantity'))
-            if sorted(prod_baths) == sorted(bath_types):
-                # Coincide exactamente
-                book = Book.objects.create(
-                    internal_order_id=BookManager._generate_internal_order_id(),
-                    book_date=date,
-                    hour=hour,
-                    people=people,
-                    comment=comment,
-                    amount_paid=Decimal("0"),
-                    amount_pending=price or Decimal("0"),
-                    client=client,
-                    product=prod,
+            
+            try:
+                # Buscar el BathType existente en la base de datos
+                bath_type = BathType.objects.get(
+                    massage_type=br.massage_type,
+                    massage_duration=br.minutes
                 )
+                
+                # Calcular precio: bathtype.price x quantity
+                bath_total_price = bath_type.price * br.quantity
+                final_price += bath_total_price
+                
+                bath_type_details.append({
+                    'bath_type': bath_type,
+                    'quantity': br.quantity,
+                    'massage_type': br.massage_type,
+                    'duration': br.minutes
+                })
+                
+            except BathType.DoesNotExist:
+                raise ValueError(f"No existe el tipo de baño: {br.massage_type} de {br.minutes} minutos")
+        
+        # Buscar producto idéntico (mismos baths y precio calculado)
+        from reservations.models import ProductBaths
+        
+        # Crear signature de los tipos de baño para comparación
+        bath_types_signature = sorted([
+            (detail['massage_type'], detail['duration'], detail['quantity']) 
+            for detail in bath_type_details
+        ])
+        
+        # Buscar productos con el mismo precio calculado
+        candidates = Product.objects.filter(price=final_price)
+        for prod in candidates:
+            # Obtener los bath_types del producto candidato
+            prod_baths = list(prod.baths.values_list(
+                'bath_type__massage_type', 
+                'bath_type__massage_duration', 
+                'quantity'
+            ))
+            prod_baths_signature = sorted(prod_baths)
+            
+            # Si coinciden exactamente los tipos de baño y cantidades
+            if bath_types_signature == prod_baths_signature:
+                # ¡Producto encontrado! Usar el existente
+                book_data = {
+                    'internal_order_id': BookManager._generate_internal_order_id(),
+                    'book_date': date,
+                    'hour': hour,
+                    'people': people,
+                    'comment': comment,
+                    'amount_paid': Decimal("0"),
+                    'amount_pending': final_price,
+                    'client': client,
+                    'product': prod,
+                }
+                
+                # Agregar creator si se proporciona
+                if creator_type_id and creator_id:
+                    book_data['creator_type_id'] = creator_type_id
+                    book_data['creator_id'] = creator_id
+                
+                book = Book.objects.create(**book_data)
+                
+                # Si la reserva se crea desde un cheque regalo, marcarlo como usado
+                BookManager._handle_gift_voucher_usage(creator_type_id, creator_id)
+                
                 return BookManager._to_dto(book)
-        # Si no existe, crear producto y sus ProductBaths
+        
+        # Si no existe, crear producto nuevo con precio calculado
+        # Generar nombre descriptivo basado en los baños
+        product_name = BookManager._generate_product_name_from_baths(baths)
+        
         product = Product.objects.create(
-            name=f"Reserva staff {date} {hour}",
-            price=price or 0,
+            name=product_name,
+            price=final_price,
             uses_capacity=True,
             uses_massagist=True,
             visible=False,
         )
-        for br in baths:
-            bath_type, _ = BathType.objects.get_or_create(
-                massage_type=br.massage_type,
-                massage_duration=br.minutes,
-                defaults={
-                    "name": f"{br.massage_type.title()} {br.minutes}'",
-                    "baths_duration": "02:00:00",
-                    "description": "Autocreado (staff)",
-                    "price": Decimal("0.00"),
-                },
-            )
+        # Crear los ProductBaths asociados usando bath_type_details
+        for detail in bath_type_details:
             ProductBaths.objects.create(
                 product=product,
-                bath_type=bath_type,
-                quantity=br.quantity,
+                bath_type=detail['bath_type'],
+                quantity=detail['quantity']
             )
-        book = Book.objects.create(
-            internal_order_id=BookManager._generate_internal_order_id(),
-            book_date=date,
-            hour=hour,
-            people=people,
-            comment=comment,
-            amount_paid=Decimal("0"),
-            amount_pending=price or Decimal("0"),
-            client=client,
-            product=product,
-        )
+        
+        book_data = {
+            'internal_order_id': BookManager._generate_internal_order_id(),
+            'book_date': date,
+            'hour': hour,
+            'people': people,
+            'comment': comment,
+            'amount_paid': Decimal("0"),
+            'amount_pending': final_price,
+            'client': client,
+            'product': product,
+        }
+        
+        # Agregar creator si se proporciona
+        if creator_type_id and creator_id:
+            book_data['creator_type_id'] = creator_type_id
+            book_data['creator_id'] = creator_id
+        
+        book = Book.objects.create(**book_data)
+        
+        # Si la reserva se crea desde un cheque regalo, marcarlo como usado
+        BookManager._handle_gift_voucher_usage(creator_type_id, creator_id)
+        
         return BookManager._to_dto(book)
 
     # ------------------------------------------------------------------

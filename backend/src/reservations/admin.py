@@ -370,8 +370,8 @@ class GiftVoucherForm(forms.ModelForm):
 
 @admin.register(GiftVoucher)
 class GiftVoucherAdmin(admin.ModelAdmin):
-    list_display = ('code', 'gift_name', 'buyer_info', 'recipient_info', 'price', 'used', 'created_at')
-    list_filter = ('used', 'bought_date', 'created_at')
+    list_display = ('code', 'gift_name', 'buyer_info', 'recipient_info', 'price', 'people', 'status', 'created_at')
+    list_filter = ('status', 'bought_date', 'created_at', 'people')
     search_fields = ('code', 'gift_name', 'buyer_client__name', 'recipients_name')
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('-created_at',)
@@ -390,7 +390,7 @@ class GiftVoucherAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Información del Vale', {
-            'fields': ('code', 'gift_name', 'gift_description', 'price')
+            'fields': ('code', 'gift_name', 'gift_description', 'price', 'people')
         }),
         ('Comprador', {
             'fields': ('buyer_client', 'bought_date')
@@ -398,8 +398,8 @@ class GiftVoucherAdmin(admin.ModelAdmin):
         ('Destinatario', {
             'fields': ('recipients_name', 'recipients_surname', 'recipients_email')
         }),
-        ('Estado', {
-            'fields': ('used',)
+        ('Estado y Pago', {
+            'fields': ('status', 'payment_date')
         }),
         ('Fechas', {
             'fields': ('created_at', 'updated_at'),
