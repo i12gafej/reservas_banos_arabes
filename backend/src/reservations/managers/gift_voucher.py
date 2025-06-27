@@ -203,7 +203,6 @@ class GiftVoucherManager:
         """Elimina un GiftVoucher."""
 
         GiftVoucher.objects.filter(id=voucher_id).delete()
-
     # ------------------------------------------------------------------
     # Creación desde STAFF (similar a BookManager.create_booking_from_staff)
     # ------------------------------------------------------------------
@@ -462,3 +461,4 @@ class GiftVoucherManager:
             
         except GiftVoucher.DoesNotExist:
             raise ValueError(f"No se encontró el cheque regalo con ID {voucher_id}")
+

@@ -107,4 +107,3 @@ export const generalSearchService = {
     return response.data;
   }
 }; 
-

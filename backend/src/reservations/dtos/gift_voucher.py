@@ -45,7 +45,6 @@ class GiftVoucherDTO:
         if self.id is None:
             raise ValueError("Se requiere 'id' para actualizar el cheque regalo")
 
-
 @dataclass
 class GiftVoucherWithDetailsDTO:
     """DTO extendido para mostrar detalles completos de un cheque regalo incluyendo cliente y producto."""
@@ -119,4 +118,5 @@ class StaffGiftVoucherPayloadDTO:
             raise ValueError("El número de personas debe ser mayor que 0")
         if not self.baths:
             raise ValueError("Debe indicar al menos un tipo de baño/masaje")
+
 

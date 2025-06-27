@@ -68,7 +68,6 @@ const CLIENT_ENDPOINT = `${BASE_URL}/clientes/`;
 export async function getClientes(): Promise<Client[]> {
   return http<Client[]>(CLIENT_ENDPOINT);
 }
-
 // ------------------------------------------------------------------
 // Funciones para unificación de clientes
 // ------------------------------------------------------------------
@@ -108,3 +107,4 @@ export async function findSimilarClients(params: {
   const url = `${CLIENT_ENDPOINT}buscar-similares/?${searchParams.toString()}`;
   return http<Client[]>(url);
 }
+

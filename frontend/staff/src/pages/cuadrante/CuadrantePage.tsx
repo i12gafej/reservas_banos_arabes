@@ -1013,7 +1013,10 @@ const CuadrantePage: React.FC = () => {
           )}
           
           {/* Lista de masajes */}
-          <MassageGrid reservations={massageReservations} />
+          <MassageGrid 
+            reservations={massageReservations} 
+            selectedDate={selectedDate ? toLocalISODate(selectedDate) : undefined}
+          />
         </div>
       )}
 

@@ -1,0 +1,354 @@
+/* ===== ESTILOS PARA PANTALLA ===== */
+.massage-print-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  overflow-y: auto;
+}
+
+.print-controls {
+  background: white;
+  padding: 1rem;
+  margin: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+}
+
+.print-controls-header {
+  margin-bottom: 1rem;
+}
+
+.print-controls-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.print-controls-header p {
+  margin: 0.5rem 0 0 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.print-controls-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.print-btn, .close-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.print-btn {
+  background: #2196f3;
+  color: white;
+}
+
+.print-btn:hover {
+  background: #1976d2;
+}
+
+.close-btn {
+  background: #f44336;
+  color: white;
+}
+
+.close-btn:hover {
+  background: #d32f2f;
+}
+
+.print-content {
+  background: white;
+  margin: 1rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.print-page {
+  width: 210mm; /* A4 width */
+  min-height: 297mm; /* A4 height */
+  margin: 0 auto;
+  padding: 20mm;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Arial', sans-serif;
+}
+
+/* ===== ESTILOS PARA IMPRESIÓN ===== */
+@media print {
+  /* Ocultar elementos de control */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Configuración de página */
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  /* Reset de estilos para impresión */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .massage-print-overlay {
+    position: static !important;
+    background: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-content {
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .print-page {
+    width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    page-break-after: always;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: avoid;
+  }
+}
+
+/* ===== HEADER ===== */
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #333;
+}
+
+.spa-info h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.spa-info h2 {
+  margin: 0.5rem 0 0 0;
+  font-size: 1.2rem;
+  color: #34495e;
+  font-weight: normal;
+}
+
+.date-info {
+  text-align: right;
+}
+
+.print-date {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #2c3e50;
+  text-transform: capitalize;
+}
+
+.page-info {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  font-style: italic;
+}
+
+/* ===== TABLA ===== */
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: auto;
+  font-size: 0.85rem;
+}
+
+.print-table th {
+  background: #34495e;
+  color: white;
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  font-weight: bold;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid #2c3e50;
+}
+
+.print-table td {
+  padding: 0.5rem;
+  border: 1px solid #bdc3c7;
+  vertical-align: top;
+  line-height: 1.3;
+}
+
+.even-row {
+  background: #f8f9fa;
+}
+
+.odd-row {
+  background: white;
+}
+
+/* Estilos específicos por columna */
+.hour-cell {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-align: center;
+  width: 8%;
+  color: #27ae60;
+}
+
+.client-cell {
+  font-weight: 600;
+  width: 20%;
+  color: #2c3e50;
+}
+
+.phone-cell {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  width: 12%;
+  color: #7f8c8d;
+}
+
+.people-cell {
+  text-align: center;
+  font-weight: bold;
+  width: 8%;
+  color: #3498db;
+}
+
+.massages-cell {
+  width: 35%;
+  font-weight: 500;
+  color: #8e44ad;
+  line-height: 1.4;
+}
+
+.comments-cell {
+  width: 17%;
+  font-style: italic;
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+/* ===== FOOTER ===== */
+.print-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #bdc3c7;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+.footer-left p,
+.footer-right p {
+  margin: 0.25rem 0;
+}
+
+.footer-left strong {
+  color: #2c3e50;
+}
+
+.footer-right {
+  text-align: right;
+}
+
+/* ===== AJUSTES ESPECÍFICOS PARA IMPRESIÓN ===== */
+@media print {
+  .print-header {
+    margin-bottom: 1.5rem;
+  }
+  
+  .print-table {
+    font-size: 0.75rem;
+  }
+  
+  .print-table th {
+    font-size: 0.7rem;
+    padding: 0.5rem 0.4rem;
+  }
+  
+  .print-table td {
+    padding: 0.4rem 0.3rem;
+  }
+  
+  .hour-cell {
+    font-size: 0.8rem;
+  }
+  
+  .massages-cell {
+    font-size: 0.75rem;
+  }
+  
+  .comments-cell {
+    font-size: 0.7rem;
+  }
+  
+  .print-footer {
+    margin-top: 1rem;
+    font-size: 0.7rem;
+  }
+}
+
+/* ===== RESPONSIVE PARA PANTALLA ===== */
+@media screen and (max-width: 1200px) {
+  .print-page {
+    width: 95vw;
+    padding: 15mm;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .print-controls {
+    margin: 0.5rem;
+  }
+  
+  .print-page {
+    width: 100vw;
+    padding: 10mm;
+  }
+  
+  .print-controls-buttons {
+    flex-direction: column;
+  }
+} 

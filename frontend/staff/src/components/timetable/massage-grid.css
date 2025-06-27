@@ -2,11 +2,42 @@
   margin-top: 1.5rem;
 }
 
+.massage-grid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
 .massage-grid-container h4 {
-  margin: 0 0 1rem 0;
+  margin: 0;
   color: #333;
-  text-align: center;
-  font-size: 0.8rem;
+  font-size: 1.1rem;
+}
+
+.print-button {
+  padding: 0.5rem 1rem;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.print-button:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.print-button:active {
+  transform: translateY(0);
 }
 
 .no-massages-message {
@@ -81,14 +112,15 @@
 .massages {
   color: #8e44ad;
   font-weight: 500;
-  min-width: 200px;
-  max-width: 300px;
+  min-width: 150px;
+  max-width: 220px;
   word-wrap: break-word;
 }
 
 .comments {
   color: #666;
-  max-width: 200px;
+  min-width: 180px;
+  max-width: 280px;
   word-wrap: break-word;
   font-style: italic;
 }
@@ -102,6 +134,21 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  .massage-grid-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .massage-grid-container h4 {
+    text-align: center;
+  }
+  
+  .print-button {
+    width: 100%;
+    justify-content: center;
+  }
+  
   .massage-books-table-wrapper {
     font-size: 0.8rem;
   }
